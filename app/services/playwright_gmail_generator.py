@@ -60,11 +60,7 @@ class PlaywrightGmailGenerator:
         
         self.timeout = 60000  # Default timeout in milliseconds
         
-        # Screenshot settings
-        self.screenshots_dir = '/tmp/gmail_screenshots'
-        self.screenshots = {}  # Store screenshots by email {email: [screenshot_paths]}
-        self.current_email = None  # Track current email for screenshots
-        os.makedirs(self.screenshots_dir, exist_ok=True)
+        # Remove screenshot functionality
         
     def _setup_virtual_display(self):
         """Set up virtual display for browser automation if needed"""
@@ -207,69 +203,7 @@ class PlaywrightGmailGenerator:
             'message': 'Display streamer not running'
         }
         
-    async def capture_screenshot(self, page, email, description):
-        """
-        Capture a screenshot of the current page state
-        
-        Args:
-            page: Playwright page object
-            email: Email address being created (for organization)
-            description: Description of the screenshot
-            
-        Returns:
-            str: Path to the screenshot file
-        """
-        try:
-            # Create timestamp for unique filename
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            
-            # Sanitize filename parts
-            email_part = email.replace('@', '_at_').replace('.', '_')
-            description_part = ''.join(c if c.isalnum() or c in '-_ ' else '_' for c in description).replace(' ', '_')
-            
-            # Create filename
-            filename = f"{timestamp}_{email_part}_{description_part}.png"
-            filepath = os.path.join(self.screenshots_dir, filename)
-            
-            # Take screenshot
-            await page.screenshot(path=filepath, full_page=True)
-            
-            # Store screenshot path
-            with self.lock:
-                if email not in self.screenshots:
-                    self.screenshots[email] = []
-                self.screenshots[email].append({
-                    'path': filepath,
-                    'description': description,
-                    'timestamp': timestamp,
-                    'filename': filename
-                })
-            
-            self.logger.info(f"Captured screenshot: {description} for {email}")
-            return filepath
-        except Exception as e:
-            self.logger.error(f"Error capturing screenshot: {str(e)}")
-            return None
-            
-    def get_screenshots(self, email=None):
-        """
-        Get list of screenshots
-        
-        Args:
-            email: Optional email to filter screenshots by
-            
-        Returns:
-            list: List of screenshot data dictionaries
-        """
-        with self.lock:
-            if email:
-                return self.screenshots.get(email, [])
-            else:
-                # Flatten all screenshots into a single list
-                all_screenshots = []
-                for email_screenshots in self.screenshots.values():
-                    all_screenshots.extend(email_screenshots)
-                return sorted(all_screenshots, key=lambda x: x['timestamp'])
+    # Screenshot functionality has been removed
         
     def create_accounts_batch(self, email_list, password, parent_email=None, max_workers=3):
         """
@@ -374,8 +308,14 @@ class PlaywrightGmailGenerator:
                     # Set the Playwright browsers path to use the user space installation
                     os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.path.expanduser("~/.cache/ms-playwright")
                     
-                    # Try to find Chrome executable first
+                    # Try to find Chrome executable first - this is critical to fix the launch error
                     chrome_executable = self._find_chrome_executable()
+                    
+                    # Important fix: Set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH if we found Chrome
+                    # This directly tells Playwright where to find Chrome
+                    if chrome_executable:
+                        self.logger.info(f"Setting PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH to {chrome_executable}")
+                        os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] = chrome_executable
                     
                     # Additional browser arguments for better compatibility
                     browser_args.extend([
@@ -397,25 +337,44 @@ class PlaywrightGmailGenerator:
                             chromium_sandbox=False  # Disable sandbox for better compatibility
                         )
                     else:
-                        # Try multiple methods to launch the browser
+                        # Try launch with explicit executable path instead of channels
                         try:
-                            # First try with installed Chrome
-                            self.logger.info("Trying to launch using 'chrome' channel")
-                            browser = await browser_type.launch(
-                                headless=self.headless,
-                                args=browser_args,
-                                channel="chrome",  # Try using installed Chrome if available
-                                downloads_path='/tmp/playwright_downloads',  # Ensure writeable path
-                                chromium_sandbox=False  # Disable sandbox for better compatibility
-                            )
+                            # Use direct executable path approach - more reliable than channels
+                            self.logger.info("Trying to launch with explicit executable path")
+                            
+                            # If we have PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH set in the environment
+                            if 'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH' in os.environ:
+                                chrome_path = os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH']
+                                self.logger.info(f"Using Chrome from environment: {chrome_path}")
+                                
+                                browser = await browser_type.launch(
+                                    headless=self.headless,
+                                    args=browser_args,
+                                    executable_path=chrome_path,  # Explicitly pass the executable path
+                                    downloads_path='/tmp/playwright_downloads',
+                                    chromium_sandbox=False
+                                )
                         except Exception as channel_error:
-                            # If chrome channel fails, try default launch
-                            self.logger.info(f"Chrome channel failed: {str(channel_error)}. Trying default launch.")
+                            # If explicit path approach fails, try with system Chrome
+                            self.logger.info(f"Chrome path error: {str(channel_error)}. Trying OS Chrome installation.")
                             browser = await browser_type.launch(
                                 headless=self.headless,
                                 args=browser_args,
-                                downloads_path='/tmp/playwright_downloads',  # Ensure writeable path
-                                chromium_sandbox=False  # Disable sandbox for better compatibility
+                                channel="chrome",  # Try using system Chrome
+                                downloads_path='/tmp/playwright_downloads',
+                                chromium_sandbox=False
+                            )
+                            
+                            # If we get here, log a success message for debugging
+                            self.logger.info("Successfully launched browser with chrome channel - unusual path")
+                        except Exception as final_error:
+                            # Last resort: try completely default launch with no customization
+                            self.logger.info(f"All specific launch methods failed: {str(final_error)}. Final attempt with defaults.")
+                            browser = await browser_type.launch(
+                                headless=self.headless,
+                                args=browser_args,
+                                downloads_path='/tmp/playwright_downloads',
+                                chromium_sandbox=False
                             )
                         
                     # Create a new context with the user agent and responsive viewport
@@ -460,8 +419,7 @@ class PlaywrightGmailGenerator:
                 # Wait for the form to load
                 await page.wait_for_selector('input[name="firstName"]')
                 
-                # Capture initial page screenshot
-                await self.capture_screenshot(page, email, "Initial signup page")
+                # Screenshot functionality removed
                 
                 # Generate random personal information
                 first_name = self._generate_random_name(5, 10)
@@ -477,8 +435,7 @@ class PlaywrightGmailGenerator:
                 # Wait for the birthday form
                 await page.wait_for_selector('#month')
                 
-                # Capture birthday form screenshot
-                await self.capture_screenshot(page, email, "Birthday verification")
+                # Screenshot functionality removed
                 
                 # Generate random birthday (13-17 years old for child account)
                 await page.select_option('#month', str(random.randint(1, 12)))
@@ -498,8 +455,7 @@ class PlaywrightGmailGenerator:
                 # Wait for the username form
                 await page.wait_for_selector('input[name="Username"]')
                 
-                # Capture username form screenshot
-                await self.capture_screenshot(page, email, "Username selection")
+                # Screenshot functionality removed
                 
                 # Enter username
                 await page.fill('input[name="Username"]', username)
@@ -524,8 +480,7 @@ class PlaywrightGmailGenerator:
                 # Wait for the password form
                 await page.wait_for_selector('input[name="Passwd"]')
                 
-                # Capture password form screenshot
-                await self.capture_screenshot(page, email, "Password form")
+                # Screenshot functionality removed
                 
                 # Enter password
                 await page.fill('input[name="Passwd"]', password)
@@ -544,8 +499,7 @@ class PlaywrightGmailGenerator:
                     if parent_consent:
                         self.logger.info("Parent consent required for child account")
                         
-                        # Capture parent consent page screenshot
-                        await self.capture_screenshot(page, email, "Parent consent required")
+                        # Screenshot functionality removed
                         
                         # Check if parent email input is available
                         try:
@@ -586,8 +540,7 @@ class PlaywrightGmailGenerator:
                     if phone_verification:
                         self.logger.info(f"Phone verification required for {email}")
                         
-                        # Capture phone verification page screenshot
-                        await self.capture_screenshot(page, email, "Phone verification required")
+                        # Screenshot functionality removed
                         
                         # Check if phone input is available
                         try:
@@ -655,8 +608,7 @@ class PlaywrightGmailGenerator:
                         # Accept terms
                         await agree_button.click()
                         
-                        # Capture 'I agree' page screenshot
-                        await self.capture_screenshot(page, email, "Terms agreement")
+                        # Screenshot functionality removed
                         
                         # Wait for the account to be created
                         continue_button = await page.wait_for_selector(
@@ -665,8 +617,7 @@ class PlaywrightGmailGenerator:
                         )
                         
                         if continue_button:
-                            # Capture final success screenshot
-                            await self.capture_screenshot(page, email, "Account creation successful")
+                            # Screenshot functionality removed
                             
                             self.logger.info(f"Successfully created account for {email}")
                             await browser.close()
@@ -758,19 +709,59 @@ class PlaywrightGmailGenerator:
                 return tmp_chrome_path
             
             # Install Chrome in /tmp directory which is always writable
-            self.logger.info("Installing Chrome in /tmp directory...")
+            self.logger.info("Installing Chrome in /tmp directory (critical for render.com)...")
             try:
                 os.makedirs(tmp_chrome_dir, exist_ok=True)
                 
-                # Download compact chromium directly to /tmp
-                download_cmds = [
-                    f"cd {tmp_chrome_dir} && curl -L https://playwright.azureedge.net/builds/chromium/1108/chromium-linux.zip -o chromium.zip",
-                    f"cd {tmp_chrome_dir} && unzip -o chromium.zip -d . && rm chromium.zip",
-                    f"cd {tmp_chrome_dir} && chmod +x chrome"
-                ]
+                # Download and extract Chrome in a single command with better error handling
+                self.logger.info("Downloading Chromium directly from Playwright CDN...")
                 
-                for cmd in download_cmds:
-                    subprocess.run(cmd, shell=True, check=True)
+                # More robust download process
+                download_cmd = f"""
+                cd {tmp_chrome_dir} && 
+                rm -f chromium.zip && 
+                curl -L https://playwright.azureedge.net/builds/chromium/1108/chromium-linux.zip -o chromium.zip && 
+                unzip -o chromium.zip && 
+                chmod +x chrome && 
+                ls -la {tmp_chrome_dir}
+                """
+                
+                # Run the command and capture output for better debugging
+                process = subprocess.run(
+                    download_cmd, 
+                    shell=True, 
+                    check=False,  # Don't throw exception so we can handle errors
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    universal_newlines=True
+                )
+                
+                # Log the output for debugging
+                self.logger.info(f"Chrome download process exit code: {process.returncode}")
+                if process.stdout:
+                    self.logger.info(f"Download output: {process.stdout}")
+                if process.stderr:
+                    self.logger.error(f"Download errors: {process.stderr}")
+                
+                # If process failed, try one more approach by installing to a user directory
+                if process.returncode != 0:
+                    self.logger.warning("Failed to install to /tmp, trying home directory...")
+                    home_chrome_dir = os.path.expanduser("~/chrome-linux")
+                    os.makedirs(home_chrome_dir, exist_ok=True)
+                    
+                    subprocess.run(
+                        f"cd {home_chrome_dir} && " +
+                        "curl -L https://playwright.azureedge.net/builds/chromium/1108/chromium-linux.zip -o chromium.zip && " +
+                        "unzip -o chromium.zip && chmod +x chrome",
+                        shell=True, 
+                        check=False
+                    )
+                    
+                    # Check if the home directory installation worked
+                    home_chrome_path = os.path.join(home_chrome_dir, "chrome")
+                    if os.path.exists(home_chrome_path) and os.access(home_chrome_path, os.X_OK):
+                        self.logger.info(f"Successfully installed Chrome to {home_chrome_path}")
+                        tmp_chrome_path = home_chrome_path  # Use this path instead
                 
                 if os.path.exists(tmp_chrome_path) and os.access(tmp_chrome_path, os.X_OK):
                     self.logger.info(f"Successfully installed Chrome to {tmp_chrome_path}")
