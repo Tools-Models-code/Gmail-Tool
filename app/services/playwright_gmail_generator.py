@@ -145,14 +145,36 @@ class PlaywrightGmailGenerator:
                             channel="chrome",  # Try using installed Chrome if available
                             downloads_path='/tmp/playwright_downloads'  # Ensure writeable path
                         )
-                
-                # Create a new context with the user agent and responsive viewport
-                context = await browser.new_context(
-                    user_agent=user_agent_string,
-                    viewport={'width': 1280, 'height': 800},
-                    device_scale_factor=1.0,
-                    is_mobile=False
-                )
+                        
+                    # Create a new context with the user agent and responsive viewport
+                    context = await browser.new_context(
+                        user_agent=user_agent_string,
+                        viewport={'width': 1280, 'height': 800},
+                        device_scale_factor=1.0,
+                        is_mobile=False
+                    )
+                except Exception as e:
+                    self.logger.error(f"Error launching browser: {str(e)}")
+                    # Try with fallback options
+                    try:
+                        self.logger.info("Attempting to launch browser with fallback options")
+                        # Try finding Chrome in standard locations
+                        browser = await browser_type.launch(
+                            headless=self.headless,
+                            args=browser_args,
+                            channel="chrome"  # Try using system Chrome as fallback
+                        )
+                        
+                        # Create a new context with the user agent and responsive viewport
+                        context = await browser.new_context(
+                            user_agent=user_agent_string,
+                            viewport={'width': 1280, 'height': 800},
+                            device_scale_factor=1.0,
+                            is_mobile=False
+                        )
+                    except Exception as inner_e:
+                        self.logger.error(f"Fallback launch also failed: {str(inner_e)}")
+                        return False, f"Error: Browser launch failed. Please run 'playwright install' on the server. Details: {str(inner_e)}"
                 
                 # Create a new page
                 page = await context.new_page()
@@ -365,21 +387,7 @@ class PlaywrightGmailGenerator:
                     self.logger.info(f"User confirmed manual completion for {email}")
                     await browser.close()
                     return True, "Account created with manual intervention"
-                
-                except Exception as e:
-                    self.logger.error(f"Error launching browser: {str(e)}")
-                    # Try with fallback options
-                    try:
-                        self.logger.info("Attempting to launch browser with fallback options")
-                        # Try finding Chrome in standard locations
-                        browser = await browser_type.launch(
-                            headless=self.headless,
-                            args=browser_args,
-                            channel="chrome"  # Try using system Chrome as fallback
-                        )
-                    except Exception as inner_e:
-                        self.logger.error(f"Fallback launch also failed: {str(inner_e)}")
-                        return False, f"Error: Browser launch failed. Please run 'playwright install' on the server. Details: {str(inner_e)}"
+                # No duplicate exception handling needed - moved to proper place in the code
             except Exception as e:
                 self.logger.error(f"Error creating account for {email}: {str(e)}")
                 
