@@ -1,11 +1,13 @@
 import json
 import random
 import string
+import logging
 from flask import Blueprint, request, jsonify, current_app
 from app.services.gmail_generator import GmailGenerator
 from app.services.proxy_manager import ProxyManager
 
 bp = Blueprint('api', __name__, url_prefix='/api')
+logger = logging.getLogger(__name__)
 
 @bp.route('/generate', methods=['POST'])
 def generate_accounts():
@@ -19,30 +21,26 @@ def generate_accounts():
     email_prefix = data.get('email_prefix', '')
     use_random_prefix = data.get('use_random_prefix', False)
     password = data.get('password', '')
-    count = data.get('count', 1)
+    count = int(data.get('count', 1))
+    selected_emails = data.get('selected_emails', [])
     proxy_settings = data.get('proxy_settings', {})
     
     # Validate required fields
     if not password:
         return jsonify({'error': 'Password is required'}), 400
     
-    if not email_prefix and not use_random_prefix:
-        return jsonify({'error': 'Email prefix or random generation option is required'}), 400
-    
-    # Initialize proxy manager
-    proxy_manager = ProxyManager(
-        proxy_type=proxy_settings.get('type', 'http'),
-        proxy_list=proxy_settings.get('list', []),
-        use_rotation=proxy_settings.get('use_rotation', True)
-    )
-    
-    # Initialize Gmail generator
-    gmail_generator = GmailGenerator(proxy_manager)
-    
-    # Generate accounts
-    results = []
-    for i in range(count):
-        try:
+    # If specific emails are selected, use those instead of generating new ones
+    if selected_emails and len(selected_emails) > 0:
+        email_list = selected_emails
+        logger.info(f"Using {len(email_list)} selected emails")
+    else:
+        # Validate email prefix for generation
+        if not email_prefix and not use_random_prefix:
+            return jsonify({'error': 'Email prefix or random generation option is required'}), 400
+        
+        # Generate email list
+        email_list = []
+        for i in range(count):
             # Generate random prefix if requested
             if use_random_prefix:
                 prefix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
@@ -53,23 +51,29 @@ def generate_accounts():
                 else:
                     prefix = email_prefix
             
-            # Generate the account
             email = f"{prefix}@gmail.com"
-            success = gmail_generator.create_account(email, password)
-            
-            results.append({
-                'email': email,
-                'password': password,
-                'success': success,
-                'message': 'Account created successfully' if success else 'Failed to create account'
-            })
-        except Exception as e:
-            results.append({
-                'email': f"{prefix}@gmail.com" if 'prefix' in locals() else 'unknown@gmail.com',
-                'password': password,
-                'success': False,
-                'message': str(e)
-            })
+            email_list.append(email)
+        
+        logger.info(f"Generated {len(email_list)} email addresses")
+    
+    # Initialize proxy manager
+    proxy_list = proxy_settings.get('list', [])
+    if isinstance(proxy_list, str):
+        # Convert string to list (one proxy per line)
+        proxy_list = [p.strip() for p in proxy_list.split('\n') if p.strip()]
+    
+    proxy_manager = ProxyManager(
+        proxy_type=proxy_settings.get('type', 'http'),
+        proxy_list=proxy_list,
+        use_rotation=proxy_settings.get('use_rotation', True)
+    )
+    
+    # Initialize Gmail generator
+    gmail_generator = GmailGenerator(proxy_manager)
+    
+    # Generate accounts in batch
+    max_workers = min(3, len(email_list))  # Limit parallel workers
+    results = gmail_generator.create_accounts_batch(email_list, password, max_workers)
     
     return jsonify({
         'results': results,

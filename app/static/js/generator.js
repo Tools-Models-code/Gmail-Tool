@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectAllButton = document.getElementById('select-all');
     const copySelectedButton = document.getElementById('copy-selected');
     const exportSelectedButton = document.getElementById('export-selected');
+    const generateSelectedButton = document.getElementById('generate-selected');
     
     // Modal elements
     const loadingModal = document.getElementById('loading-modal');
@@ -33,6 +34,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Store generated accounts
     let generatedAccounts = [];
+    // Store generated emails before account creation
+    let generatedEmails = [];
     
     // Toggle random prefix checkbox
     useRandomPrefixCheckbox.addEventListener('change', () => {
@@ -85,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Generator form submission
+    // Generator form submission - Step 1: Generate email previews
     generatorForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -115,6 +118,98 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Generate email previews
+        generatedEmails = [];
+        
+        // Clear results list
+        resultsList.innerHTML = '';
+        
+        for (let i = 0; i < count; i++) {
+            let prefix;
+            if (useRandomPrefix) {
+                // Generate random prefix (10 characters)
+                prefix = Array(10).fill().map(() => 
+                    'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(
+                        Math.floor(Math.random() * 36)
+                    )
+                ).join('');
+            } else {
+                // Use provided prefix with random number for uniqueness
+                if (count > 1) {
+                    const randomNum = Math.floor(Math.random() * 9999) + 1;
+                    prefix = `${emailPrefix}${randomNum}`;
+                } else {
+                    prefix = emailPrefix;
+                }
+            }
+            
+            const email = `${prefix}@gmail.com`;
+            generatedEmails.push(email);
+            
+            // Add to results list
+            const resultItem = document.createElement('div');
+            resultItem.className = 'result-item preview';
+            resultItem.innerHTML = `
+                <div class="checkbox">
+                    <input type="checkbox" id="email-${i}" class="email-checkbox" checked>
+                    <label for="email-${i}"></label>
+                </div>
+                <div class="result-details">
+                    <div class="result-email">${email}</div>
+                    <div class="result-password">Password: ${password}</div>
+                    <div class="result-message status-pending">Ready to generate</div>
+                </div>
+            `;
+            resultsList.appendChild(resultItem);
+        }
+        
+        // Update counts
+        totalCountElement.textContent = generatedEmails.length;
+        successCountElement.textContent = '0';
+        failedCountElement.textContent = '0';
+        
+        // Add generate selected button if it doesn't exist
+        if (!document.getElementById('generate-selected')) {
+            const actionsDiv = document.querySelector('.results-actions');
+            const generateBtn = document.createElement('button');
+            generateBtn.id = 'generate-selected';
+            generateBtn.className = 'btn btn-primary';
+            generateBtn.innerHTML = '<i class="fas fa-cog"></i> Generate Selected';
+            actionsDiv.appendChild(generateBtn);
+            
+            // Add event listener to the new button
+            generateBtn.addEventListener('click', generateSelectedAccounts);
+        } else {
+            // Show the button if it exists
+            document.getElementById('generate-selected').style.display = 'inline-block';
+        }
+        
+        // Remove empty state if present
+        const emptyState = resultsList.querySelector('.empty-state');
+        if (emptyState) {
+            emptyState.remove();
+        }
+        
+        // Switch to results tab
+        resultsTab.click();
+        
+        showNotification(`Generated ${count} email previews. Select which ones to create.`, 'success');
+    });
+    
+    // Step 2: Generate selected accounts
+    async function generateSelectedAccounts() {
+        // Get selected emails
+        const checkboxes = document.querySelectorAll('.email-checkbox:checked');
+        if (checkboxes.length === 0) {
+            showNotification('Please select at least one email to generate', 'warning');
+            return;
+        }
+        
+        const selectedEmails = Array.from(checkboxes).map(checkbox => {
+            const emailElement = checkbox.closest('.result-item').querySelector('.result-email');
+            return emailElement.textContent;
+        });
+        
         // Get proxy settings
         const useProxy = useProxyCheckbox.checked;
         let proxySettings = {};
@@ -143,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             proxySettings = {
                 type: proxyType,
-                list: proxyListArray,
+                list: proxyList, // Send as string, server will parse
                 use_rotation: useProxyRotation
             };
         }
@@ -151,7 +246,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show loading modal
         loadingModal.classList.add('active');
         progressBar.style.width = '0%';
-        progressText.textContent = `0/${count} accounts`;
+        progressText.textContent = `0/${selectedEmails.length} accounts`;
         
         try {
             const response = await fetch('/api/generate', {
@@ -160,10 +255,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    email_prefix: emailPrefix,
-                    use_random_prefix: useRandomPrefix,
-                    password: password,
-                    count: count,
+                    password: passwordInput.value,
+                    selected_emails: selectedEmails,
                     proxy_settings: proxySettings
                 })
             });
@@ -177,8 +270,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Update results tab
                 updateResultsTab(data.results, data.summary);
                 
-                // Switch to results tab
-                resultsTab.click();
+                // Hide generate selected button
+                const generateBtn = document.getElementById('generate-selected');
+                if (generateBtn) {
+                    generateBtn.style.display = 'none';
+                }
                 
                 showNotification(`Generated ${data.summary.successful} out of ${data.summary.total} accounts`, 'success');
             } else {
@@ -190,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Hide loading modal
             loadingModal.classList.remove('active');
         }
-    });
+    }
     
     // Update progress bar (simulated for now)
     function updateProgress(current, total) {
@@ -224,19 +320,24 @@ document.addEventListener('DOMContentLoaded', function() {
             const resultItem = document.createElement('div');
             resultItem.className = `result-item ${result.success ? 'success' : 'failed'}`;
             resultItem.innerHTML = `
-                <input type="checkbox" class="result-checkbox" data-index="${index}">
-                <div class="status">
-                    <i class="fas ${result.success ? 'fa-check-circle' : 'fa-times-circle'}"></i>
+                <div class="checkbox">
+                    <input type="checkbox" id="result-${index}" class="result-checkbox" data-index="${index}">
+                    <label for="result-${index}"></label>
                 </div>
                 <div class="result-details">
                     <div class="result-email">${result.email}</div>
                     <div class="result-password">Password: ${result.password}</div>
-                    <div class="result-message">${result.message}</div>
+                    <div class="result-message ${result.success ? 'status-success' : 'status-failed'}">${result.message}</div>
                 </div>
                 <div class="result-actions">
-                    <button class="copy-account" data-index="${index}" title="Copy account details">
+                    <button class="btn btn-sm copy-account" data-index="${index}" title="Copy account details">
                         <i class="fas fa-copy"></i>
                     </button>
+                    ${result.success ? 
+                        `<button class="btn btn-sm login-account" data-index="${index}" title="Login to account">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </button>` : 
+                        ''}
                 </div>
             `;
             resultsList.appendChild(resultItem);
@@ -245,6 +346,16 @@ document.addEventListener('DOMContentLoaded', function() {
             resultItem.querySelector('.copy-account').addEventListener('click', () => {
                 copyAccountToClipboard(result);
             });
+            
+            // Add event listener to login button if account was created successfully
+            if (result.success) {
+                const loginButton = resultItem.querySelector('.login-account');
+                if (loginButton) {
+                    loginButton.addEventListener('click', () => {
+                        window.open(`https://accounts.google.com/signin`, '_blank');
+                    });
+                }
+            }
         });
     }
     
