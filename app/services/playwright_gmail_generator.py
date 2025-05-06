@@ -4,6 +4,7 @@ import string
 import logging
 import asyncio
 import threading
+import os
 from concurrent.futures import ThreadPoolExecutor
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from fake_useragent import UserAgent
@@ -121,13 +122,29 @@ class PlaywrightGmailGenerator:
                 
                 # Define additional launch options with proper error handling
                 try:
-                    # Launch browser with fallback options
-                    browser = await browser_type.launch(
-                        headless=self.headless,
-                        args=browser_args,
-                        channel="chrome",  # Try using installed Chrome if available
-                        downloads_path='/tmp/playwright_downloads'  # Ensure writeable path
-                    )
+                    # Set the Playwright browsers path to use the user space installation
+                    os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.path.expanduser("~/.cache/ms-playwright")
+                    
+                    # Try to find Chrome executable first
+                    chrome_executable = self._find_chrome_executable()
+                    
+                    # Launch browser with the found executable path if available
+                    if chrome_executable:
+                        self.logger.info(f"Launching browser with executable: {chrome_executable}")
+                        browser = await browser_type.launch(
+                            headless=self.headless,
+                            args=browser_args,
+                            executable_path=chrome_executable,
+                            downloads_path='/tmp/playwright_downloads'  # Ensure writeable path
+                        )
+                    else:
+                        # Fall back to standard launch
+                        browser = await browser_type.launch(
+                            headless=self.headless,
+                            args=browser_args,
+                            channel="chrome",  # Try using installed Chrome if available
+                            downloads_path='/tmp/playwright_downloads'  # Ensure writeable path
+                        )
                 
                 # Create a new context with the user agent and responsive viewport
                 context = await browser.new_context(
@@ -354,9 +371,11 @@ class PlaywrightGmailGenerator:
                     # Try with fallback options
                     try:
                         self.logger.info("Attempting to launch browser with fallback options")
+                        # Try finding Chrome in standard locations
                         browser = await browser_type.launch(
                             headless=self.headless,
-                            args=browser_args
+                            args=browser_args,
+                            channel="chrome"  # Try using system Chrome as fallback
                         )
                     except Exception as inner_e:
                         self.logger.error(f"Fallback launch also failed: {str(inner_e)}")
@@ -401,3 +420,81 @@ class PlaywrightGmailGenerator:
         length = random.randint(min_length, max_length)
         name = ''.join(random.choices(string.ascii_lowercase, k=length))
         return name.capitalize()
+        
+    def _find_chrome_executable(self):
+        """Find the Chrome executable path on the system"""
+        import os
+        import glob
+        import subprocess
+        
+        # Possible locations for Chrome/Chromium on different platforms
+        chrome_paths = [
+            # User-installed Playwright browsers (most common locations)
+            os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux/chrome"),
+            os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux/chrome-linux/chrome"),
+            os.path.expanduser("~/.cache/ms-playwright/chromium-*-*/chrome-linux/chrome"),
+            os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-win/chrome.exe"),
+            os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium"),
+            
+            # NPM-installed Playwright browsers
+            os.path.expanduser("~/.cache/playwright/chromium-*/chrome-linux/chrome"),
+            os.path.expanduser("~/node_modules/playwright-chromium/.local-browsers/chromium-*/chrome-linux/chrome"),
+            os.path.expanduser("~/.npm/playwright-chromium/.local-browsers/chromium-*/chrome-linux/chrome"),
+
+            # Additional potential locations for render.com
+            os.path.expanduser("~/chrome-linux/chrome"),
+            os.path.expanduser("~/chromium/chrome-linux/chrome"),
+            
+            # System Chrome/Chromium on Linux
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            
+            # System Chrome on MacOS
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            
+            # System Chrome on Windows
+            "C:/Program Files/Google/Chrome/Application/chrome.exe",
+            "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+        ]
+        
+        # Try each path pattern
+        for path_pattern in chrome_paths:
+            matching_paths = glob.glob(path_pattern)
+            if matching_paths:
+                # Return the first match
+                self.logger.info(f"Found Chrome executable at: {matching_paths[0]}")
+                return matching_paths[0]
+        
+        # If no executable found using patterns, try using 'which' command on Linux/Mac
+        try:
+            which_chrome = subprocess.run(["which", "google-chrome"], capture_output=True, text=True, check=False)
+            if which_chrome.returncode == 0 and which_chrome.stdout.strip():
+                path = which_chrome.stdout.strip()
+                self.logger.info(f"Found Chrome using 'which' at: {path}")
+                return path
+        except Exception:
+            pass  # Ignore errors from which command
+        
+        # If still no executable found, try to download one directly if we're on render.com
+        if os.environ.get('RENDER') or os.environ.get('PRODUCTION'):
+            try:
+                self.logger.info("Attempting to download Chrome directly...")
+                # Create directory for Chrome
+                os.makedirs(os.path.expanduser("~/chrome-linux"), exist_ok=True)
+                
+                # Download and extract Chrome
+                download_cmd = "cd ~ && curl -L https://playwright.azureedge.net/builds/chromium/1108/chromium-linux.zip -o chromium.zip && unzip -o chromium.zip && chmod +x ~/chrome-linux/chrome"
+                subprocess.run(download_cmd, shell=True, check=True)
+                
+                chrome_path = os.path.expanduser("~/chrome-linux/chrome")
+                if os.path.exists(chrome_path):
+                    self.logger.info(f"Successfully downloaded Chrome to {chrome_path}")
+                    return chrome_path
+            except Exception as e:
+                self.logger.error(f"Failed to download Chrome directly: {str(e)}")
+        
+        # If no executable found, return None to let Playwright use its default
+        self.logger.warning("No Chrome executable found, using Playwright default")
+        return None
