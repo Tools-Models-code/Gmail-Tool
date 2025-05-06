@@ -146,6 +146,7 @@ main {
 .form-group input[type="text"],
 .form-group input[type="password"],
 .form-group input[type="number"],
+.form-group input[type="email"],
 .form-group select,
 .form-group textarea {
     width: 100%;
@@ -156,6 +157,13 @@ main {
     color: var(--text-color);
     font-size: 1rem;
     transition: border-color var(--transition-speed);
+}
+
+.form-group small.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
 }
 
 .form-group input:focus,
@@ -169,17 +177,20 @@ main {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-bottom: 1rem;
 }
 
 .form-group.checkbox label {
     margin-bottom: 0;
     cursor: pointer;
+    font-weight: normal;
 }
 
 .form-group.checkbox input[type="checkbox"] {
     width: 18px;
     height: 18px;
     cursor: pointer;
+    accent-color: var(--primary-color);
 }
 
 .password-input {
@@ -270,7 +281,8 @@ main {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    transition: background-color var(--transition-speed);
+    transition: all var(--transition-speed);
+    border-bottom: 2px solid transparent;
 }
 
 .tab:hover {
@@ -280,6 +292,11 @@ main {
 .tab.active {
     background-color: var(--background-dark);
     border-bottom: 2px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.tab.active i {
+    color: var(--primary-color);
 }
 
 .tab-content {
@@ -376,6 +393,7 @@ main {
     background-color: var(--background-dark);
     margin-bottom: 0.5rem;
     transition: background-color var(--transition-speed);
+    border-left: 4px solid transparent;
 }
 
 .result-item:hover {
@@ -386,8 +404,16 @@ main {
     color: var(--success-color);
 }
 
+.result-item.success {
+    border-left: 4px solid var(--success-color);
+}
+
 .result-item.failed .status i {
     color: var(--danger-color);
+}
+
+.result-item.failed {
+    border-left: 4px solid var(--danger-color);
 }
 
 .result-item.preview {
@@ -403,29 +429,18 @@ main {
 }
 
 .checkbox input[type="checkbox"] {
-    display: none;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    margin-right: 8px;
+    accent-color: var(--primary-color);
 }
 
 .checkbox label {
     display: inline-block;
-    width: 20px;
-    height: 20px;
-    background-color: var(--background-darker);
-    border: 2px solid var(--text-muted);
-    border-radius: 3px;
     cursor: pointer;
     position: relative;
-}
-
-.checkbox input[type="checkbox"]:checked + label::after {
-    content: '\f00c';
-    font-family: 'Font Awesome 5 Free';
-    font-weight: 900;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: var(--primary-color);
+    margin-bottom: 0;
 }
 
 .result-details {
@@ -460,17 +475,27 @@ main {
 }
 
 .result-email {
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+    color: var(--text-color);
 }
 
 .result-password {
     color: var(--text-muted);
     font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    font-family: monospace;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
 }
 
 .result-message {
     font-size: 0.875rem;
     color: var(--text-muted);
+    margin-top: 0.25rem;
 }
 
 .result-actions {
@@ -520,6 +545,17 @@ main {
     text-align: center;
     max-width: 400px;
     width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-note {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    color: var(--warning-color);
+    background-color: rgba(250, 166, 26, 0.1);
+    padding: 0.75rem;
+    border-radius: var(--border-radius);
+    border-left: 3px solid var(--warning-color);
 }
 
 .spinner {

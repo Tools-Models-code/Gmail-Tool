@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const useRandomPrefixCheckbox = document.getElementById('use-random-prefix');
     const passwordInput = document.getElementById('password');
     const countInput = document.getElementById('count');
+    const createChildAccountCheckbox = document.getElementById('create-child-account');
+    const parentEmailInput = document.getElementById('parent-email');
+    const showBrowserCheckbox = document.getElementById('show-browser');
     const useProxyCheckbox = document.getElementById('use-proxy');
     const proxySettings = document.querySelector('.proxy-settings');
     const proxyTypeSelect = document.getElementById('proxy-type');
@@ -49,6 +52,15 @@ document.addEventListener('DOMContentLoaded', function() {
     useProxyCheckbox.addEventListener('change', () => {
         proxySettings.style.display = useProxyCheckbox.checked ? 'block' : 'none';
     });
+    
+    // Toggle parent email field based on child account checkbox
+    createChildAccountCheckbox.addEventListener('change', () => {
+        const parentEmailGroup = document.getElementById('parent-email-group');
+        parentEmailGroup.style.display = createChildAccountCheckbox.checked ? 'block' : 'none';
+    });
+    
+    // Initialize parent email visibility
+    document.getElementById('parent-email-group').style.display = createChildAccountCheckbox.checked ? 'block' : 'none';
     
     // Test proxy button
     testProxyButton.addEventListener('click', async () => {
@@ -257,7 +269,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     password: passwordInput.value,
                     selected_emails: selectedEmails,
-                    proxy_settings: proxySettings
+                    proxy_settings: proxySettings,
+                    parent_email: parentEmailInput.value.trim(),
+                    headless: !showBrowserCheckbox.checked
                 })
             });
             
