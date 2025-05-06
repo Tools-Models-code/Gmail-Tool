@@ -59,6 +59,11 @@ ENV HEADLESS=true
 # Expose port
 EXPOSE 5000
 
-# Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:create_app()", "--workers", "2", "--timeout", "120"]
+# Create a startup script that ensures environment is properly set up
+RUN echo '#!/bin/bash' > /app/start.sh && \
+    echo 'exec gunicorn --bind 0.0.0.0:5000 "app:create_app()" --workers 2 --timeout 120' >> /app/start.sh && \
+    chmod +x /app/start.sh
+
+# Run the application using the startup script
+CMD ["/app/start.sh"]
 

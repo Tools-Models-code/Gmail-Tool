@@ -3,14 +3,29 @@ services:
     name: backdoor-gmail-tool
     env: python
     buildCommand: |
+      # Make sure we're in the right directory
+      echo "Current directory: $(pwd)"
+      
+      # Create and activate virtual environment
+      python -m venv .venv
+      source .venv/bin/activate
+      
       # Make sure pip is up to date
       pip install --upgrade pip
       
-      # Explicitly install gunicorn first
+      # Install critical dependencies explicitly first
+      echo "Installing Flask and Gunicorn..."
+      pip install Flask==2.2.5
       pip install gunicorn==21.2.0
       
       # Install Python requirements
+      echo "Installing all requirements..."
       pip install -r requirements.txt
+      
+      # Verify critical dependencies are installed
+      echo "Verifying installations..."
+      pip list | grep "Flask"
+      pip list | grep "gunicorn"
       
       # Install Playwright in user space without requiring root
       export PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright
@@ -35,11 +50,21 @@ services:
       npm install -g playwright-core
       npx playwright install chromium
       
-      # Verify gunicorn is installed and in PATH
-      echo "Checking gunicorn installation..."
+      # Create a wrapper script for gunicorn that ensures venv is activated
+      echo "#!/bin/bash" > start.sh
+      echo "source .venv/bin/activate" >> start.sh
+      echo "exec gunicorn --bind 0.0.0.0:\$PORT \"app:create_app()\" --workers 2 --timeout 120" >> start.sh
+      chmod +x start.sh
+      
+      # Path check for debugging
+      echo "PATH: $PATH"
+      echo "Python path: $(which python)"
+      echo "Python version: $(python --version)"
       which gunicorn || echo "gunicorn not found in PATH"
-      pip list | grep gunicorn
-    startCommand: gunicorn --bind 0.0.0.0:$PORT "app:create_app()" --workers 2 --timeout 120
+      
+      # List all installed packages for debugging
+      pip list
+    startCommand: ./start.sh
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
