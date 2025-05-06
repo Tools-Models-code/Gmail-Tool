@@ -169,14 +169,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Show fallback display (screenshots)
+    // Show fallback message when display is not available
     function showFallback() {
         // Reset iframe
         vnciframe.src = 'about:blank';
         
         // Update placeholder
         statusMessage.textContent = 'Browser display not available';
-        loadingMessage.textContent = 'Using screenshots instead';
+        loadingMessage.textContent = 'Display service not available in this environment';
         placeholder.style.display = 'flex';
         
         // Show fallback message
@@ -184,14 +184,8 @@ document.addEventListener('DOMContentLoaded', function() {
             fallbackMessage.style.display = 'block';
         }
         
-        // Show screenshots
-        const screenshotBtn = document.getElementById('show-browser-screenshot');
-        if (screenshotBtn) {
-            screenshotBtn.click();
-        }
-        
-        // Let the generator.js know we're using fallback mode
-        addLogEntry('Using screenshots instead of live browser display', 'info');
+        // Let the generator.js know about the fallback mode
+        addLogEntry('Browser display not available in this environment', 'info');
     }
     
     // Helper function to add log entry if available

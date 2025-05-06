@@ -74,7 +74,7 @@ class DisplayStreamer:
                     logger.info(f"VNC server started on port {self.vnc_port}")
                 except Exception as vnc_error:
                     logger.error(f"Failed to start VNC server: {str(vnc_error)}")
-                    # Continue without VNC server - just for screenshots
+                    # Continue without VNC server - VNC functionality will be limited
                     vnc_available = False
             else:
                 logger.warning("VNC server not available. Continuing with limited functionality.")
@@ -86,7 +86,7 @@ class DisplayStreamer:
                 websockify_available = False
                 logger.warning("Skipping WebSocket proxy setup since VNC is not available.")
             
-            # We're running even if just in screenshot mode without VNC
+            # We're running even if with limited functionality
             self.running = True
             
             # Start monitoring thread only if VNC is available
@@ -96,7 +96,7 @@ class DisplayStreamer:
                 self.status_thread.start()
                 logger.info("Display streamer started successfully with VNC")
             else:
-                logger.info("Display streamer started in screenshot-only mode")
+                logger.info("Display streamer started with limited functionality")
             
             return True
         except Exception as e:
@@ -263,8 +263,8 @@ class DisplayStreamer:
         message = ""
         
         if not vnc_running and not websockify_running:
-            status = "screenshot_only"
-            message = "VNC server not available. Running in screenshot-only mode."
+            status = "unavailable"
+            message = "VNC server not available. Running with limited functionality."
         elif vnc_running and not websockify_running:
             status = "partial"
             message = "VNC server running but WebSocket proxy not available."
