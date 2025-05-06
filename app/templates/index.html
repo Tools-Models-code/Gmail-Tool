@@ -199,29 +199,42 @@
                                 <div class="browser-view-container">
                                     <h4><i class="fas fa-laptop"></i> Browser View</h4>
                                     <div class="browser-frame" id="browser-frame">
-                                        <iframe id="browser-iframe" src="about:blank" style="display: none;"></iframe>
+                                        <!-- noVNC iframe for browser display -->
+                                        <iframe id="vnc-iframe" src="about:blank" frameborder="0" style="width: 100%; height: 100%; display: block;"></iframe>
+                                        
+                                        <!-- Loading/error display overlay -->
                                         <div class="browser-placeholder" id="browser-placeholder">
-                                            <div class="empty-state">
+                                            <div id="connection-status-display" class="empty-state">
                                                 <i class="fas fa-desktop"></i>
-                                                <p>The browser is opening on your computer</p>
+                                                <p id="browser-status-message">Connecting to browser display...</p>
                                                 <div class="browser-loading">
                                                     <div class="spinner"></div>
-                                                    <p>Please check your desktop for the browser window</p>
+                                                    <p id="browser-loading-message">Please wait while the display initializes</p>
                                                 </div>
-                                                <p class="browser-notice">Click "View Live Browser" button to see the automation in real-time</p>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="browser-controls">
-                                        <button id="show-browser-screenshot" class="btn btn-sm">
-                                            <i class="fas fa-camera"></i> Show Latest Screenshots
-                                        </button>
-                                        <button id="refresh-screenshots" class="btn btn-sm">
-                                            <i class="fas fa-sync"></i> Refresh Screenshots
-                                        </button>
-                                        <button id="open-browser-window" class="btn btn-sm" title="Opens the live browser view in a new window">
-                                            <i class="fas fa-desktop"></i> View Live Browser
-                                        </button>
+                                        <div class="connection-info">
+                                            <span class="status-label">Status:</span>
+                                            <span id="connection-status" class="status-value status-disconnected">Initializing</span>
+                                            <span id="connection-message" class="status-message"></span>
+                                        </div>
+                                        <div class="control-buttons">
+                                            <button id="show-browser-screenshot" class="btn btn-sm">
+                                                <i class="fas fa-camera"></i> Show Screenshots
+                                            </button>
+                                            <button id="refresh-screenshots" class="btn btn-sm">
+                                                <i class="fas fa-sync"></i> Refresh Screenshots
+                                            </button>
+                                            <button id="reconnect-vnc" class="btn btn-sm" title="Reconnect to the browser display">
+                                                <i class="fas fa-sync"></i> Reconnect Display
+                                            </button>
+                                        </div>
+                                        <div id="fallback-message" class="fallback-message" style="display: none;">
+                                            <p><i class="fas fa-exclamation-triangle"></i> Live browser display is not available in this environment.</p>
+                                            <p>Using screenshots to show browser activity instead.</p>
+                                        </div>
                                     </div>
                                     <div class="screenshot-viewer" id="screenshot-viewer" style="display: none;">
                                         <div class="screenshot-navigation">
@@ -297,5 +310,6 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/generator.js') }}"></script>
+<script src="{{ url_for('static', filename='js/browser-display.js') }}"></script>
 {% endblock %}
 
