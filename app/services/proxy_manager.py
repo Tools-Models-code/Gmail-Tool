@@ -1,0 +1,100 @@
+import os
+import random
+import requests
+import time
+from fake_useragent import UserAgent
+from flask import current_app
+
+class ProxyManager:
+    """Manages proxy connections for the Gmail account generator"""
+    
+    def __init__(self, proxy_type='http', proxy_list=None, use_rotation=True):
+        self.proxy_type = proxy_type
+        self.proxy_list = proxy_list or []
+        self.use_rotation = use_rotation
+        self.current_proxy_index = 0
+        self.user_agent = UserAgent()
+        
+        # Load proxies from environment if available and no list provided
+        if not self.proxy_list and current_app.config.get('PROXY_LIST'):
+            proxy_file = current_app.config.get('PROXY_LIST')
+            if os.path.exists(proxy_file):
+                with open(proxy_file, 'r') as f:
+                    self.proxy_list = [line.strip() for line in f if line.strip()]
+    
+    def get_proxy(self):
+        """Get a proxy from the list based on rotation settings"""
+        if not self.proxy_list:
+            return None
+        
+        if self.use_rotation:
+            # Get next proxy in rotation
+            proxy = self.proxy_list[self.current_proxy_index]
+            self.current_proxy_index = (self.current_proxy_index + 1) % len(self.proxy_list)
+        else:
+            # Get a random proxy
+            proxy = random.choice(self.proxy_list)
+        
+        return self._format_proxy(proxy)
+    
+    def _format_proxy(self, proxy):
+        """Format the proxy string based on the proxy type"""
+        if not proxy:
+            return None
+            
+        # If proxy already has the type prefix, return as is
+        if proxy.startswith(('http://', 'https://', 'socks4://', 'socks5://')):
+            return proxy
+            
+        # Add the appropriate prefix based on proxy type
+        return f"{self.proxy_type}://{proxy}"
+    
+    def get_proxies_dict(self, proxy=None):
+        """Convert a proxy string to a dictionary format for requests"""
+        if not proxy:
+            proxy = self.get_proxy()
+            
+        if not proxy:
+            return {}
+            
+        return {
+            'http': proxy,
+            'https': proxy
+        }
+    
+    def get_user_agent(self):
+        """Get a random user agent string"""
+        return self.user_agent.random
+    
+    def test_proxy(self, proxy=None):
+        """Test if a proxy is working by making a request to a test URL"""
+        if not proxy:
+            proxy = self.get_proxy()
+            
+        if not proxy:
+            return False, "No proxy provided"
+            
+        formatted_proxy = self._format_proxy(proxy)
+        proxies = self.get_proxies_dict(formatted_proxy)
+        
+        try:
+            headers = {'User-Agent': self.get_user_agent()}
+            response = requests.get('https://www.google.com', 
+                                   proxies=proxies, 
+                                   headers=headers, 
+                                   timeout=10)
+            
+            if response.status_code == 200:
+                return True, "Proxy is working"
+            else:
+                return False, f"Proxy returned status code: {response.status_code}"
+                
+        except requests.exceptions.ProxyError:
+            return False, "Invalid proxy or proxy connection failed"
+        except requests.exceptions.ConnectTimeout:
+            return False, "Proxy connection timed out"
+        except requests.exceptions.ReadTimeout:
+            return False, "Proxy read timed out"
+        except Exception as e:
+            return False, f"Proxy test failed: {str(e)}"
+

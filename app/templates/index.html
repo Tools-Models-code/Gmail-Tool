@@ -1,0 +1,159 @@
+{% extends "layout.html" %}
+
+{% block title %}Backdoor Gmail Tool - Generate Gmail Accounts{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-user-plus"></i> Gmail Account Generator</h2>
+        </div>
+        <div class="card-body">
+            <div class="tabs">
+                <div class="tab-header">
+                    <div class="tab active" data-tab="generator">
+                        <i class="fas fa-cog"></i> Generator
+                    </div>
+                    <div class="tab" data-tab="proxy">
+                        <i class="fas fa-shield-alt"></i> Proxy Settings
+                    </div>
+                    <div class="tab" data-tab="results">
+                        <i class="fas fa-list"></i> Results
+                    </div>
+                </div>
+                <div class="tab-content">
+                    <div class="tab-pane active" id="generator">
+                        <form id="generator-form">
+                            <div class="form-group">
+                                <label for="email-prefix">Email Prefix</label>
+                                <input type="text" id="email-prefix" name="email_prefix" placeholder="Enter email prefix (e.g. johndoe)">
+                            </div>
+                            <div class="form-group checkbox">
+                                <input type="checkbox" id="use-random-prefix" name="use_random_prefix">
+                                <label for="use-random-prefix">Use Random Prefix</label>
+                            </div>
+                            <div class="form-group">
+                                <label for="password">Password</label>
+                                <div class="password-input">
+                                    <input type="password" id="password" name="password" placeholder="Enter password for accounts" required>
+                                    <button type="button" class="toggle-password">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="count">Number of Accounts</label>
+                                <input type="number" id="count" name="count" min="1" max="50" value="1">
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-play"></i> Generate Accounts
+                                </button>
+                                <button type="reset" class="btn btn-secondary">
+                                    <i class="fas fa-redo"></i> Reset
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="tab-pane" id="proxy">
+                        <form id="proxy-form">
+                            <div class="form-group checkbox">
+                                <input type="checkbox" id="use-proxy" name="use_proxy" checked>
+                                <label for="use-proxy">Use Proxy (Recommended)</label>
+                            </div>
+                            <div class="proxy-settings">
+                                <div class="form-group">
+                                    <label for="proxy-type">Proxy Type</label>
+                                    <select id="proxy-type" name="proxy_type">
+                                        <option value="http">HTTP</option>
+                                        <option value="https">HTTPS</option>
+                                        <option value="socks4">SOCKS4</option>
+                                        <option value="socks5">SOCKS5</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="proxy-address">Single Proxy (IP:Port)</label>
+                                    <div class="input-with-button">
+                                        <input type="text" id="proxy-address" name="proxy_address" placeholder="e.g. 192.168.1.1:8080">
+                                        <button type="button" id="test-proxy" class="btn btn-sm">
+                                            <i class="fas fa-vial"></i> Test
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="proxy-list">Proxy List (One per line)</label>
+                                    <textarea id="proxy-list" name="proxy_list" rows="5" placeholder="Enter one proxy per line (IP:Port)"></textarea>
+                                </div>
+                                <div class="form-group checkbox">
+                                    <input type="checkbox" id="use-proxy-rotation" name="use_proxy_rotation" checked>
+                                    <label for="use-proxy-rotation">Use Proxy Rotation</label>
+                                </div>
+                                <div class="form-group">
+                                    <button type="button" id="import-proxies" class="btn btn-secondary">
+                                        <i class="fas fa-file-import"></i> Import Proxy List
+                                    </button>
+                                    <input type="file" id="proxy-file" accept=".txt" style="display: none;">
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="tab-pane" id="results">
+                        <div class="results-container">
+                            <div class="results-header">
+                                <h3>Generated Accounts</h3>
+                                <div class="results-actions">
+                                    <button id="select-all" class="btn btn-sm">
+                                        <i class="fas fa-check-square"></i> Select All
+                                    </button>
+                                    <button id="copy-selected" class="btn btn-sm">
+                                        <i class="fas fa-copy"></i> Copy Selected
+                                    </button>
+                                    <button id="export-selected" class="btn btn-sm">
+                                        <i class="fas fa-file-export"></i> Export
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="results-summary">
+                                <div class="summary-item">
+                                    <span class="label">Total:</span>
+                                    <span class="value" id="total-count">0</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="label">Success:</span>
+                                    <span class="value" id="success-count">0</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="label">Failed:</span>
+                                    <span class="value" id="failed-count">0</span>
+                                </div>
+                            </div>
+                            <div class="results-list" id="results-list">
+                                <div class="empty-state">
+                                    <i class="fas fa-inbox"></i>
+                                    <p>No accounts generated yet</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="loading-modal">
+    <div class="modal-content">
+        <div class="spinner"></div>
+        <p>Generating accounts...</p>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <p id="progress-text">0/0 accounts</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/generator.js') }}"></script>
+{% endblock %}
+

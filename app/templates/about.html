@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+
+{% block title %}About - Backdoor Gmail Tool{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-info-circle"></i> About Backdoor Gmail Tool</h2>
+        </div>
+        <div class="card-body">
+            <div class="about-content">
+                <div class="about-section">
+                    <h3><i class="fas fa-star"></i> Features</h3>
+                    <ul>
+                        <li>Create multiple Gmail accounts simultaneously</li>
+                        <li>Set custom passwords for all generated accounts</li>
+                        <li>Proxy support to avoid rate limiting and IP blocking</li>
+                        <li>Dark-themed, user-friendly interface</li>
+                        <li>Select and manage generated email accounts</li>
+                    </ul>
+                </div>
+                
+                <div class="about-section">
+                    <h3><i class="fas fa-shield-alt"></i> Proxy Support</h3>
+                    <p>The application supports various proxy types:</p>
+                    <ul>
+                        <li>HTTP/HTTPS</li>
+                        <li>SOCKS4/SOCKS5</li>
+                    </ul>
+                    <p>You can either:</p>
+                    <ul>
+                        <li>Enter proxy details manually</li>
+                        <li>Upload a proxy list file</li>
+                        <li>Use the built-in proxy rotation feature</li>
+                    </ul>
+                </div>
+                
+                <div class="about-section">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Disclaimer</h3>
+                    <p>This tool is for educational and testing purposes only. Please use responsibly and in accordance with Gmail's terms of service.</p>
+                    <p>The developers of this tool are not responsible for any misuse or violations of terms of service that may result from using this application.</p>
+                </div>
+                
+                <div class="about-section">
+                    <h3><i class="fas fa-code"></i> Technical Details</h3>
+                    <p>Backdoor Gmail Tool is built with:</p>
+                    <ul>
+                        <li>Flask - Python web framework</li>
+                        <li>Selenium - Browser automation</li>
+                        <li>Modern HTML/CSS/JavaScript</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
