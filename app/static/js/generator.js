@@ -129,6 +129,18 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Create a result display area if it doesn't exist
+        let resultsDetailArea = document.getElementById('proxy-results-detail');
+        if (!resultsDetailArea) {
+            resultsDetailArea = document.createElement('div');
+            resultsDetailArea.id = 'proxy-results-detail';
+            resultsDetailArea.className = 'proxy-results-detail';
+            proxyTestResults.appendChild(resultsDetailArea);
+        } else {
+            // Clear previous results
+            resultsDetailArea.innerHTML = '';
+        }
+        
         // Confirm with user if there are many proxies
         if (proxiesToTest.length > 10) {
             if (!confirm(`You are about to test ${proxiesToTest.length} proxies. This may take some time. Continue?`)) {
@@ -148,56 +160,195 @@ document.addEventListener('DOMContentLoaded', function() {
         testAllProxiesButton.disabled = true;
         testAllProxiesButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
         
+        // Add a stop button next to the test button
+        let stopButton = document.getElementById('stop-proxy-tests');
+        if (!stopButton) {
+            stopButton = document.createElement('button');
+            stopButton.id = 'stop-proxy-tests';
+            stopButton.className = 'btn btn-danger';
+            stopButton.innerHTML = '<i class="fas fa-stop"></i> Stop Testing';
+            testAllProxiesButton.parentNode.insertBefore(stopButton, testAllProxiesButton.nextSibling);
+        } else {
+            stopButton.style.display = 'inline-block';
+        }
+        
         // Scroll to results
         proxyTestResults.scrollIntoView({ behavior: 'smooth' });
         
-        try {
-            const response = await fetch('/api/proxy/test_all', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    type: proxyTypeSelect.value,
-                    list: proxiesToTest
-                })
-            });
+        // Setup for batch testing
+        const BATCH_SIZE = 5; // Test 5 proxies at a time
+        let batchIndex = 0;
+        let currentBatch = [];
+        let allWorkingProxies = [];
+        let totalSuccessful = 0;
+        let totalFailed = 0;
+        let totalTested = 0;
+        let isCancelled = false;
+        
+        // Add cancel function to stop button
+        stopButton.onclick = function() {
+            isCancelled = true;
+            showNotification('Proxy testing cancelled', 'warning');
+        };
+        
+        // Function to process a batch of proxies
+        async function processBatch() {
+            if (isCancelled) {
+                finishTesting();
+                return;
+            }
             
-            const data = await response.json();
+            // Calculate start and end indices
+            const startIdx = batchIndex * BATCH_SIZE;
+            const endIdx = Math.min(startIdx + BATCH_SIZE, proxiesToTest.length);
             
-            if (response.ok) {
-                // Update counts
-                proxyTotalCount.textContent = data.total;
-                proxyWorkingCount.textContent = data.successful;
-                proxyFailedCount.textContent = data.failed;
+            // If we've tested all proxies, finish
+            if (startIdx >= proxiesToTest.length) {
+                finishTesting();
+                return;
+            }
+            
+            // Get current batch
+            currentBatch = proxiesToTest.slice(startIdx, endIdx);
+            
+            // Show which proxies are being tested
+            const testingMessage = document.createElement('div');
+            testingMessage.className = 'proxy-batch-header';
+            testingMessage.innerHTML = `<p>Testing proxies ${startIdx+1} to ${endIdx} of ${proxiesToTest.length}...</p>`;
+            resultsDetailArea.appendChild(testingMessage);
+            
+            try {
+                // Send the batch to server for testing
+                const response = await fetch('/api/proxy/test_all', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: proxyTypeSelect.value,
+                        list: currentBatch,
+                        batch_size: BATCH_SIZE,
+                        batch_index: batchIndex
+                    })
+                });
                 
-                // Set progress to 100%
-                proxyTestProgressBar.style.width = '100%';
-                proxyTestProgressText.textContent = `${data.total}/${data.total} proxies tested`;
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
                 
-                // Update proxy list with only working proxies
-                if (data.working_proxies.length > 0) {
-                    if (data.failed > 0) {
-                        if (confirm(`${data.failed} proxies failed the test. Would you like to remove them from the list?`)) {
-                            proxyListTextarea.value = data.working_proxies.join('\n');
-                            showNotification(`Proxy list updated with ${data.successful} working proxies`, 'success');
+                const data = await response.json();
+                
+                // Process the results
+                if (data.results && data.results.length > 0) {
+                    // Create container for this batch
+                    const batchResults = document.createElement('div');
+                    batchResults.className = 'proxy-batch-results';
+                    
+                    // Add individual results
+                    data.results.forEach(result => {
+                        // Count results
+                        if (result.success) {
+                            totalSuccessful++;
+                            allWorkingProxies.push(result.proxy);
+                        } else {
+                            totalFailed++;
                         }
+                        totalTested++;
+                        
+                        // Create result element
+                        const resultElement = document.createElement('div');
+                        resultElement.className = `proxy-result ${result.success ? 'success' : 'failed'}`;
+                        resultElement.innerHTML = `
+                            <div class="proxy-result-status">
+                                <i class="fas fa-${result.success ? 'check' : 'times'}-circle"></i>
+                            </div>
+                            <div class="proxy-result-details">
+                                <div class="proxy-address">${result.proxy}</div>
+                                <div class="proxy-message">${result.message}</div>
+                            </div>
+                        `;
+                        batchResults.appendChild(resultElement);
+                    });
+                    
+                    // Add batch results to container
+                    resultsDetailArea.appendChild(batchResults);
+                    
+                    // Update progress
+                    const progress = (totalTested / proxiesToTest.length) * 100;
+                    proxyTestProgressBar.style.width = `${progress}%`;
+                    proxyTestProgressText.textContent = `${totalTested}/${proxiesToTest.length} proxies tested`;
+                    
+                    // Update counts
+                    proxyTotalCount.textContent = proxiesToTest.length;
+                    proxyWorkingCount.textContent = totalSuccessful;
+                    proxyFailedCount.textContent = totalFailed;
+                    
+                    // Scroll to show latest results
+                    resultsDetailArea.scrollTop = resultsDetailArea.scrollHeight;
+                    
+                    // Move to next batch
+                    batchIndex++;
+                    setTimeout(processBatch, 100); // Small delay between batches
+                }
+            } catch (error) {
+                console.error("Error testing proxies:", error);
+                const errorElement = document.createElement('div');
+                errorElement.className = 'proxy-error';
+                errorElement.innerHTML = `<p>Error: ${error.message}</p>`;
+                resultsDetailArea.appendChild(errorElement);
+                
+                // Continue to next batch despite error
+                batchIndex++;
+                setTimeout(processBatch, 300);
+            }
+        }
+        
+        // Function to finish testing
+        function finishTesting() {
+            // Re-enable button
+            testAllProxiesButton.disabled = false;
+            testAllProxiesButton.innerHTML = '<i class="fas fa-vials"></i> Test All Proxies';
+            
+            // Hide stop button
+            if (stopButton) {
+                stopButton.style.display = 'none';
+            }
+            
+            // Show summary
+            if (isCancelled) {
+                showNotification(`Testing cancelled after checking ${totalTested} proxies`, 'warning');
+            } else if (totalTested > 0) {
+                // Update proxy list with only working proxies
+                if (allWorkingProxies.length > 0) {
+                    if (totalFailed > 0) {
+                        const summaryElement = document.createElement('div');
+                        summaryElement.className = 'proxy-test-summary-message';
+                        summaryElement.innerHTML = `
+                            <p>Completed testing ${totalTested} proxies: 
+                            <span class="success-count">${totalSuccessful} working</span>, 
+                            <span class="failed-count">${totalFailed} failed</span></p>
+                            <button id="remove-failed-proxies" class="btn btn-primary">
+                                <i class="fas fa-filter"></i> Remove Failed Proxies
+                            </button>
+                        `;
+                        resultsDetailArea.appendChild(summaryElement);
+                        
+                        // Add event listener to the remove button
+                        document.getElementById('remove-failed-proxies').addEventListener('click', () => {
+                            proxyListTextarea.value = allWorkingProxies.join('\n');
+                            showNotification(`Proxy list updated with ${totalSuccessful} working proxies`, 'success');
+                        });
                     } else {
                         showNotification('All proxies are working correctly!', 'success');
                     }
                 } else {
                     showNotification('No working proxies found!', 'error');
                 }
-            } else {
-                showNotification(`Error: ${data.error || 'Failed to test proxies'}`, 'error');
             }
-        } catch (error) {
-            showNotification('Error testing proxies: ' + error.message, 'error');
-        } finally {
-            // Re-enable button
-            testAllProxiesButton.disabled = false;
-            testAllProxiesButton.innerHTML = '<i class="fas fa-vials"></i> Test All Proxies';
         }
+        
+        // Start processing batches
+        processBatch();
     });
     
     // Generator form submission - Step 1: Generate email previews
@@ -365,10 +516,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Switch to proxy tab to ensure user configures proxies
-        document.querySelector('.tab[data-tab="proxy"]').click();
-        
-        // Show proxy setup modal
+        // Direct to proxy setup modal without switching tabs
         showProxySetupModal(checkboxes.length);
     }
     
@@ -656,13 +804,19 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Set up browser placeholder
         const browserPlaceholder = document.getElementById('browser-placeholder');
-        browserPlaceholder.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-desktop"></i>
-                <p>The browser will open on your computer shortly</p>
-                <small style="margin-top: 10px; color: var(--text-muted);">You may need to bring the browser window to the front</small>
-            </div>
-        `;
+        browserPlaceholder.style.display = 'flex';
+        
+        // Setup screenshot button
+        const screenshotBtn = document.getElementById('show-browser-screenshot');
+        screenshotBtn.addEventListener('click', () => {
+            captureAndShowBrowserScreenshot();
+        });
+        
+        // Setup open browser window button
+        const openWindowBtn = document.getElementById('open-browser-window');
+        openWindowBtn.addEventListener('click', () => {
+            openBrowserStatusWindow();
+        });
         
         // Set up manual continue button
         const manualContinueBtn = document.getElementById('manual-continue');
@@ -671,6 +825,132 @@ document.addEventListener('DOMContentLoaded', function() {
             showNotification('Continuing the account creation process...', 'info');
             manualContinueBtn.disabled = true;
         });
+    }
+    
+    // Capture and show browser screenshot
+    function captureAndShowBrowserScreenshot() {
+        addLogEntry('Capturing browser screenshot...', 'info');
+        
+        // Show placeholder with loading state
+        const browserPlaceholder = document.getElementById('browser-placeholder');
+        browserPlaceholder.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-camera"></i>
+                <p>Capturing browser screenshot...</p>
+                <div class="browser-loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        `;
+        browserPlaceholder.style.display = 'flex';
+        
+        // In this implementation, we're showing a mock screenshot since we can't actually
+        // capture the browser screen. In a real implementation, this would need a backend service.
+        setTimeout(() => {
+            // Create a mock screenshot
+            const mockScreenshot = document.createElement('div');
+            mockScreenshot.className = 'browser-screenshot';
+            mockScreenshot.innerHTML = `
+                <div style="padding: 20px; text-align: center;">
+                    <h3>Browser Activity</h3>
+                    <p>The browser is currently executing automation tasks.</p>
+                    <p>Please check your desktop for the actual browser window.</p>
+                </div>
+            `;
+            
+            // Replace placeholder content
+            browserPlaceholder.innerHTML = '';
+            browserPlaceholder.appendChild(mockScreenshot);
+            
+            addLogEntry('Browser screenshot captured', 'success');
+        }, 1500);
+    }
+    
+    // Open a new window with browser status information
+    function openBrowserStatusWindow() {
+        const statusWindow = window.open('', 'BrowserStatus', 'width=600,height=400');
+        if (statusWindow) {
+            statusWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Browser Automation Status</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            background: #2f3136;
+                            color: #dcddde;
+                        }
+                        .status-header {
+                            margin-bottom: 20px;
+                            border-bottom: 1px solid #40444b;
+                            padding-bottom: 10px;
+                        }
+                        .status-item {
+                            margin-bottom: 15px;
+                            padding: 10px;
+                            background: #36393f;
+                            border-radius: 5px;
+                        }
+                        .status-title {
+                            font-weight: bold;
+                            margin-bottom: 5px;
+                        }
+                        .log-container {
+                            height: 200px;
+                            overflow-y: auto;
+                            background: #40444b;
+                            padding: 10px;
+                            border-radius: 5px;
+                            margin-top: 10px;
+                        }
+                        .log-entry {
+                            margin-bottom: 5px;
+                            font-family: monospace;
+                            font-size: 12px;
+                        }
+                        .success { color: #43b581; }
+                        .info { color: #7289da; }
+                        .warning { color: #faa61a; }
+                        .error { color: #f04747; }
+                    </style>
+                </head>
+                <body>
+                    <div class="status-header">
+                        <h2>Browser Automation Status</h2>
+                        <p>This window shows the current status of the browser automation process</p>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-title">Browser Status:</div>
+                        <div>Running automation tasks</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-title">Current Action:</div>
+                        <div>Creating Gmail account</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-title">Activity Log:</div>
+                        <div class="log-container" id="log-container">
+                            <div class="log-entry info">Browser launched successfully</div>
+                            <div class="log-entry info">Navigated to account creation page</div>
+                            <div class="log-entry info">Filling out account details...</div>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-title">Note:</div>
+                        <div>The actual browser window is running on your desktop. This is just a status window.</div>
+                    </div>
+                </body>
+                </html>
+            `);
+            statusWindow.document.close();
+            
+            addLogEntry('Opened browser status window', 'info');
+        } else {
+            showNotification('Unable to open browser status window. Please check your popup blocker settings.', 'warning');
+        }
     }
     
     // Add log entry

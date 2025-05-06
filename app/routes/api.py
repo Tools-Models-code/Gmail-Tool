@@ -140,47 +140,93 @@ def test_all_proxies():
     
     proxy_type = data.get('type', 'http')
     proxy_list = data.get('list', [])
+    batch_size = data.get('batch_size', -1)  # -1 means test all at once
+    batch_index = data.get('batch_index', 0)
     
     # If proxy_list is provided as a string, convert to list
     if isinstance(proxy_list, str):
         proxy_list = [p.strip() for p in proxy_list.split('\n') if p.strip()]
     
+    # Clean the proxy list (remove empty entries)
+    proxy_list = [p for p in proxy_list if p and p.strip()]
+    
     if not proxy_list:
         return jsonify({'error': 'No proxies to test'}), 400
+    
+    # Handle batch processing
+    total_proxies = len(proxy_list)
+    
+    if batch_size > 0 and batch_size < total_proxies:
+        # Calculate start and end indices for this batch
+        start_idx = batch_index * batch_size
+        end_idx = min(start_idx + batch_size, total_proxies)
+        
+        # Get the current batch of proxies
+        current_batch = proxy_list[start_idx:end_idx]
+        
+        # Calculate progress
+        progress = {
+            'total_proxies': total_proxies,
+            'processed': start_idx,
+            'batch_size': batch_size,
+            'batch_index': batch_index,
+            'has_more': end_idx < total_proxies,
+            'next_batch_index': batch_index + 1 if end_idx < total_proxies else -1
+        }
+    else:
+        # Process all proxies at once
+        current_batch = proxy_list
+        progress = {
+            'total_proxies': total_proxies,
+            'processed': 0,
+            'batch_size': total_proxies,
+            'batch_index': 0,
+            'has_more': False,
+            'next_batch_index': -1
+        }
     
     # Initialize proxy manager
     proxy_manager = ProxyManager(
         proxy_type=proxy_type,
-        proxy_list=proxy_list,
+        proxy_list=current_batch,
         use_rotation=False
     )
     
-    # Test all proxies
+    # Test proxies in the current batch
     results = []
     working_proxies = []
     
-    for proxy in proxy_list:
+    for proxy in current_batch:
         if not proxy or not proxy.strip():
             continue
+        
+        try:
+            success, message = proxy_manager.test_proxy(proxy.strip())
             
-        success, message = proxy_manager.test_proxy(proxy.strip())
-        
-        result = {
-            'proxy': proxy.strip(),
-            'success': success,
-            'message': message
-        }
-        
-        results.append(result)
-        
-        if success:
-            working_proxies.append(proxy.strip())
+            result = {
+                'proxy': proxy.strip(),
+                'success': success,
+                'message': message
+            }
+            
+            results.append(result)
+            
+            if success:
+                working_proxies.append(proxy.strip())
+        except Exception as e:
+            # Handle any exceptions during testing
+            results.append({
+                'proxy': proxy.strip(),
+                'success': False,
+                'message': f"Error during test: {str(e)}"
+            })
     
     return jsonify({
         'results': results,
         'working_proxies': working_proxies,
         'total': len(results),
         'successful': len(working_proxies),
-        'failed': len(results) - len(working_proxies)
+        'failed': len(results) - len(working_proxies),
+        'progress': progress
     })
 
