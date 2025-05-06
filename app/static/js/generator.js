@@ -847,6 +847,25 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Export selected button
     exportSelectedButton.addEventListener('click', () => {
+        // Check if we're in preview mode or results mode
+        const emailCheckboxes = document.querySelectorAll('.email-checkbox:checked');
+        if (emailCheckboxes.length > 0) {
+            // We're in preview mode
+            const selectedEmails = Array.from(emailCheckboxes).map(checkbox => {
+                const emailElement = checkbox.closest('.result-item').querySelector('.result-email');
+                const passwordElement = checkbox.closest('.result-item').querySelector('.result-password');
+                return {
+                    email: emailElement.textContent,
+                    password: passwordElement.textContent.replace('Password: ', ''),
+                    success: true, // Preview items are always considered "success" for export
+                    message: 'Preview item'
+                };
+            });
+            exportAccountsToFile(selectedEmails);
+            return;
+        }
+        
+        // We're in results mode
         const selectedIndices = getSelectedIndices();
         if (selectedIndices.length === 0) {
             showNotification('Please select at least one account', 'warning');
@@ -885,7 +904,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Export accounts to file
     function exportAccountsToFile(accounts) {
-        const text = accounts.map(account => `${account.email},${account.password},${account.success ? 'Success' : 'Failed'}`).join('\n');
+        // Add CSV header
+        const header = 'Email,Password,Status,Message';
+        
+        // Format each account as a CSV row
+        const rows = accounts.map(account => 
+            `${account.email},${account.password},${account.success ? 'Success' : 'Failed'},${account.message || ''}`
+        );
+        
+        // Combine header and rows
+        const text = [header, ...rows].join('\n');
+        
+        // Create and download the file
         const blob = new Blob([text], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -895,6 +925,7 @@ document.addEventListener('DOMContentLoaded', function() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        
         showNotification(`${accounts.length} accounts exported to CSV file`, 'success');
     }
     
