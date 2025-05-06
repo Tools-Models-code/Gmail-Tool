@@ -1,4 +1,6 @@
 import os
+import logging
+import subprocess
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -28,6 +30,27 @@ def create_app(test_config=None):
         os.makedirs(app.instance_path)
     except OSError:
         pass
+        
+    # Try to ensure Playwright is properly installed
+    try:
+        # Check if we're in a production environment (like Render)
+        if os.environ.get('RENDER') or os.environ.get('PRODUCTION'):
+            logging.info("Production environment detected, checking Playwright installation...")
+            
+            # Check if chromium is installed
+            chromium_path = os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux/chrome")
+            if not os.path.exists(chromium_path.replace("*", "1169")) and not os.path.exists(chromium_path.replace("*", "1045")):
+                logging.warning("Playwright browsers not found, attempting installation...")
+                
+                try:
+                    # Try to install Playwright browsers
+                    subprocess.run(["playwright", "install", "chromium"], check=True)
+                    subprocess.run(["playwright", "install-deps", "chromium"], check=True)
+                    logging.info("Playwright browsers installed successfully")
+                except Exception as e:
+                    logging.error(f"Failed to install Playwright browsers: {str(e)}")
+    except Exception as e:
+        logging.error(f"Error during Playwright setup: {str(e)}")
 
     # Register blueprints
     from app.routes import main, api

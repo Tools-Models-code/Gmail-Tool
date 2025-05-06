@@ -95,35 +95,46 @@ class PlaywrightGmailGenerator:
         # Extract username from email
         username = email.split('@')[0]
         
-        async with async_playwright() as p:
-            # Set up browser options
-            browser_type = p.chromium
-            
-            # Configure proxy if available
-            proxy = None
-            if self.proxy_manager:
-                with self.lock:
-                    proxy = self.proxy_manager.get_proxy()
-            
-            browser_args = []
-            if proxy:
-                self.logger.info(f"Using proxy: {proxy}")
-                browser_args.append(f'--proxy-server={proxy}')
-            
-            # Get random user agent
-            user_agent_string = self.user_agent.random
-            
-            # Launch browser
-            try:
-                browser = await browser_type.launch(
-                    headless=self.headless,
-                    args=browser_args
-                )
+        try:
+            async with async_playwright() as p:
+                # Set up browser options
+                browser_type = p.chromium
                 
-                # Create a new context with the user agent
+                # Configure proxy if available
+                proxy = None
+                if self.proxy_manager:
+                    with self.lock:
+                        proxy = self.proxy_manager.get_proxy()
+                
+                browser_args = []
+                if proxy:
+                    self.logger.info(f"Using proxy: {proxy}")
+                    browser_args.append(f'--proxy-server={proxy}')
+                
+                # Add mobile device emulation for better compatibility
+                browser_args.append('--disable-infobars')
+                browser_args.append('--disable-notifications')
+                browser_args.append('--disable-extensions')
+                
+                # Get random user agent
+                user_agent_string = self.user_agent.random
+                
+                # Define additional launch options with proper error handling
+                try:
+                    # Launch browser with fallback options
+                    browser = await browser_type.launch(
+                        headless=self.headless,
+                        args=browser_args,
+                        channel="chrome",  # Try using installed Chrome if available
+                        downloads_path='/tmp/playwright_downloads'  # Ensure writeable path
+                    )
+                
+                # Create a new context with the user agent and responsive viewport
                 context = await browser.new_context(
                     user_agent=user_agent_string,
-                    viewport={'width': 1280, 'height': 800}
+                    viewport={'width': 1280, 'height': 800},
+                    device_scale_factor=1.0,
+                    is_mobile=False
                 )
                 
                 # Create a new page
@@ -338,8 +349,24 @@ class PlaywrightGmailGenerator:
                     await browser.close()
                     return True, "Account created with manual intervention"
                 
+                except Exception as e:
+                    self.logger.error(f"Error launching browser: {str(e)}")
+                    # Try with fallback options
+                    try:
+                        self.logger.info("Attempting to launch browser with fallback options")
+                        browser = await browser_type.launch(
+                            headless=self.headless,
+                            args=browser_args
+                        )
+                    except Exception as inner_e:
+                        self.logger.error(f"Fallback launch also failed: {str(inner_e)}")
+                        return False, f"Error: Browser launch failed. Please run 'playwright install' on the server. Details: {str(inner_e)}"
             except Exception as e:
                 self.logger.error(f"Error creating account for {email}: {str(e)}")
+                
+                # Check if the error is related to missing browser
+                if "Executable doesn't exist" in str(e):
+                    return False, f"Error: {str(e)} - Please run 'playwright install' to download the required browsers."
                 return False, f"Error: {str(e)}"
             finally:
                 # Close the browser

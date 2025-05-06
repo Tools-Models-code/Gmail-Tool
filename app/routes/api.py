@@ -130,3 +130,57 @@ def test_proxy():
         'message': message
     })
 
+@bp.route('/proxy/test_all', methods=['POST'])
+def test_all_proxies():
+    """API endpoint to test multiple proxies"""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    
+    proxy_type = data.get('type', 'http')
+    proxy_list = data.get('list', [])
+    
+    # If proxy_list is provided as a string, convert to list
+    if isinstance(proxy_list, str):
+        proxy_list = [p.strip() for p in proxy_list.split('\n') if p.strip()]
+    
+    if not proxy_list:
+        return jsonify({'error': 'No proxies to test'}), 400
+    
+    # Initialize proxy manager
+    proxy_manager = ProxyManager(
+        proxy_type=proxy_type,
+        proxy_list=proxy_list,
+        use_rotation=False
+    )
+    
+    # Test all proxies
+    results = []
+    working_proxies = []
+    
+    for proxy in proxy_list:
+        if not proxy or not proxy.strip():
+            continue
+            
+        success, message = proxy_manager.test_proxy(proxy.strip())
+        
+        result = {
+            'proxy': proxy.strip(),
+            'success': success,
+            'message': message
+        }
+        
+        results.append(result)
+        
+        if success:
+            working_proxies.append(proxy.strip())
+    
+    return jsonify({
+        'results': results,
+        'working_proxies': working_proxies,
+        'total': len(results),
+        'successful': len(working_proxies),
+        'failed': len(results) - len(working_proxies)
+    })
+
