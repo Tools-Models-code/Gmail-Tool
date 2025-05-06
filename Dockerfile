@@ -60,5 +60,5 @@ ENV HEADLESS=true
 EXPOSE 5000
 
 # Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "run:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:create_app()", "--workers", "2", "--timeout", "120"]
 
