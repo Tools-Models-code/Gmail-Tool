@@ -418,6 +418,65 @@ main {
 
 .result-item.preview {
     border-left: 4px solid var(--primary-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.result-item.preview:hover {
+    background-color: var(--background-light);
+}
+
+/* Improve checkbox visibility */
+.checkbox input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    border: 2px solid var(--primary-color);
+    border-radius: 4px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: var(--background-light);
+    position: relative;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.checkbox input[type="checkbox"]:checked {
+    background-color: var(--primary-color);
+}
+
+.checkbox input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    color: white;
+    font-size: 18px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Highlight selected email items */
+.result-item.preview:has(input[type="checkbox"]:checked) {
+    background-color: rgba(114, 137, 218, 0.2);
+    border-left: 4px solid var(--success-color);
+}
+
+/* Style for the Create Selected Accounts button */
+#generate-selected {
+    background-color: var(--success-color);
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+#generate-selected:hover {
+    background-color: #3a9c6f;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
 }
 
 .result-checkbox {

@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Generator form submission - Step 1: Generate email previews
     generatorForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        console.log("Generator form submitted");
         
         // Validate form
         const emailPrefix = emailPrefixInput.value.trim();
@@ -172,6 +173,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="result-message status-pending">Ready to generate</div>
                 </div>
             `;
+            
+            // Add click event to the entire result item for better UX
+            resultItem.addEventListener('click', (e) => {
+                // Don't toggle if clicking on the checkbox itself
+                if (e.target.type !== 'checkbox' && !e.target.classList.contains('checkbox')) {
+                    const checkbox = resultItem.querySelector('.email-checkbox');
+                    checkbox.checked = !checkbox.checked;
+                }
+            });
             resultsList.appendChild(resultItem);
         }
         
@@ -182,20 +192,54 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Add generate selected button if it doesn't exist
         if (!document.getElementById('generate-selected')) {
+            // Remove any existing button container
+            const existingContainer = document.getElementById('start-button-container');
+            if (existingContainer) {
+                existingContainer.remove();
+            }
+            
             const actionsDiv = document.querySelector('.results-actions');
             const generateBtn = document.createElement('button');
             generateBtn.id = 'generate-selected';
-            generateBtn.className = 'btn btn-primary';
-            generateBtn.innerHTML = '<i class="fas fa-cog"></i> Create Selected Accounts';
-            actionsDiv.appendChild(generateBtn);
+            generateBtn.className = 'btn btn-primary btn-large';
+            generateBtn.style.fontSize = '1.2em';
+            generateBtn.style.padding = '15px 30px';
+            generateBtn.style.marginTop = '20px';
+            generateBtn.style.marginBottom = '20px';
+            generateBtn.style.display = 'block';
+            generateBtn.style.width = '80%';
+            generateBtn.style.maxWidth = '400px';
+            generateBtn.style.borderRadius = '8px';
+            generateBtn.style.fontWeight = 'bold';
+            generateBtn.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+            generateBtn.innerHTML = '<i class="fas fa-play"></i> START CREATION';
+            
+            // Create a container for the button to center it
+            const btnContainer = document.createElement('div');
+            btnContainer.id = 'start-button-container';
+            btnContainer.style.textAlign = 'center';
+            btnContainer.style.marginTop = '25px';
+            btnContainer.style.marginBottom = '20px';
+            btnContainer.appendChild(generateBtn);
+            
+            // Add a help text
+            const helpText = document.createElement('p');
+            helpText.style.color = 'var(--text-muted)';
+            helpText.style.marginTop = '10px';
+            helpText.style.fontSize = '0.9em';
+            helpText.innerHTML = '1. Select the emails you want to create<br>2. Click START CREATION to begin';
+            btnContainer.appendChild(helpText);
+            
+            // Add the container after the actions div
+            actionsDiv.parentNode.insertBefore(btnContainer, actionsDiv.nextSibling);
             
             // Add event listener to the new button
             generateBtn.addEventListener('click', generateSelectedAccounts);
         } else {
             // Show the button if it exists
             const generateBtn = document.getElementById('generate-selected');
-            generateBtn.style.display = 'inline-block';
-            generateBtn.innerHTML = '<i class="fas fa-cog"></i> Create Selected Accounts';
+            generateBtn.style.display = 'block';
+            generateBtn.innerHTML = '<i class="fas fa-play"></i> START CREATION';
         }
         
         // Remove empty state if present
@@ -207,22 +251,27 @@ document.addEventListener('DOMContentLoaded', function() {
         // Switch to results tab
         resultsTab.click();
         
-        showNotification(`Generated ${count} email previews. Please select which ones to create and click the "Create Selected Accounts" button.`, 'success');
+        showNotification(`Generated ${count} email previews. Please SELECT which emails you want to use, then click the "START CREATION" button below.`, 'success');
     });
     
     // Step 2: Generate selected accounts
     async function generateSelectedAccounts() {
+        console.log("Start Creation button clicked");
+        
         // Get selected emails
         const checkboxes = document.querySelectorAll('.email-checkbox:checked');
         if (checkboxes.length === 0) {
-            showNotification('Please select at least one email to generate', 'warning');
+            showNotification('Please SELECT at least one email before clicking START CREATION', 'warning');
             return;
         }
         
         // Confirm with user
-        if (!confirm(`You are about to create ${checkboxes.length} Gmail accounts. Continue?`)) {
+        if (!confirm(`You are about to CREATE ${checkboxes.length} Gmail accounts. This will register actual accounts with Google. Continue?`)) {
             return;
         }
+        
+        // Force show browser to be checked
+        showBrowserCheckbox.checked = true;
         
         const selectedEmails = Array.from(checkboxes).map(checkbox => {
             const emailElement = checkbox.closest('.result-item').querySelector('.result-email');
@@ -382,13 +431,48 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Select all button
     selectAllButton.addEventListener('click', () => {
-        const checkboxes = resultsList.querySelectorAll('.result-checkbox');
-        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        // Check if we're in preview mode (email-checkbox) or results mode (result-checkbox)
+        const emailCheckboxes = resultsList.querySelectorAll('.email-checkbox');
+        const resultCheckboxes = resultsList.querySelectorAll('.result-checkbox');
         
+        // Determine which checkboxes to use
+        const checkboxes = emailCheckboxes.length > 0 ? emailCheckboxes : resultCheckboxes;
+        
+        // Select all checkboxes
         checkboxes.forEach(checkbox => {
-            checkbox.checked = !allChecked;
+            checkbox.checked = true;
         });
+        
+        showNotification('All emails selected', 'info');
     });
+    
+    // Add Deselect All button if it doesn't exist
+    if (!document.getElementById('deselect-all')) {
+        const deselectBtn = document.createElement('button');
+        deselectBtn.id = 'deselect-all';
+        deselectBtn.className = 'btn btn-sm';
+        deselectBtn.innerHTML = '<i class="fas fa-square"></i> Deselect All';
+        
+        // Insert after select all button
+        selectAllButton.parentNode.insertBefore(deselectBtn, selectAllButton.nextSibling);
+        
+        // Add event listener
+        deselectBtn.addEventListener('click', () => {
+            // Check if we're in preview mode (email-checkbox) or results mode (result-checkbox)
+            const emailCheckboxes = resultsList.querySelectorAll('.email-checkbox');
+            const resultCheckboxes = resultsList.querySelectorAll('.result-checkbox');
+            
+            // Determine which checkboxes to use
+            const checkboxes = emailCheckboxes.length > 0 ? emailCheckboxes : resultCheckboxes;
+            
+            // Deselect all checkboxes
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            showNotification('All emails deselected', 'info');
+        });
+    }
     
     // Copy selected button
     copySelectedButton.addEventListener('click', () => {

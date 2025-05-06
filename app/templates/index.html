@@ -159,12 +159,20 @@
 <div class="modal" id="loading-modal">
     <div class="modal-content">
         <div class="spinner"></div>
-        <p>Generating accounts...</p>
+        <h3 style="margin-bottom: 15px; color: var(--primary-color);">Creating Gmail Accounts...</h3>
         <div class="progress-container">
             <div class="progress-bar" id="progress-bar"></div>
         </div>
         <p id="progress-text">0/0 accounts</p>
-        <p class="modal-note">If prompted, please interact with the browser window and follow the instructions in the terminal.</p>
+        <div class="modal-note" style="margin-top: 20px; padding: 15px; background-color: var(--background-light); border-radius: 8px;">
+            <p><strong>Important:</strong></p>
+            <ul style="text-align: left; margin-top: 10px; margin-left: 20px;">
+                <li>A browser window will open for you to interact with</li>
+                <li>You may need to solve CAPTCHA or verification challenges</li>
+                <li>Follow any prompts that appear in the browser</li>
+                <li>Do not close the browser until the process is complete</li>
+            </ul>
+        </div>
     </div>
 </div>
 {% endblock %}
