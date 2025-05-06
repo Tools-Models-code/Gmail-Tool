@@ -70,6 +70,15 @@
                         </form>
                     </div>
                     <div class="tab-pane" id="proxy">
+                        <div class="info-box" style="background-color: var(--background-light); padding: 15px; border-radius: var(--border-radius); margin-bottom: 20px;">
+                            <h3 style="margin-bottom: 10px; color: var(--warning-color);"><i class="fas fa-exclamation-triangle"></i> Important: Proxy Setup Required</h3>
+                            <p>Gmail account creation requires proxies to avoid IP bans. You must configure at least one proxy before creating accounts.</p>
+                            <ol style="margin-left: 20px; margin-top: 10px;">
+                                <li>Enter at least one proxy in either the single proxy field or the proxy list below</li>
+                                <li>After selecting emails in the Results tab, you'll be prompted to verify your proxy setup</li>
+                                <li>You can test your proxy connection using the Test button</li>
+                            </ol>
+                        </div>
                         <form id="proxy-form">
                             <div class="form-group checkbox">
                                 <input type="checkbox" id="use-proxy" name="use_proxy" checked>
@@ -101,6 +110,7 @@
                                 <div class="form-group checkbox">
                                     <input type="checkbox" id="use-proxy-rotation" name="use_proxy_rotation" checked>
                                     <label for="use-proxy-rotation">Use Proxy Rotation</label>
+                                    <small class="form-text">Automatically rotate through proxies for each account creation</small>
                                 </div>
                                 <div class="form-group">
                                     <button type="button" id="import-proxies" class="btn btn-secondary">

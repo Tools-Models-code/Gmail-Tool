@@ -254,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showNotification(`Generated ${count} email previews. Please SELECT which emails you want to use, then click the "START CREATION" button below.`, 'success');
     });
     
-    // Step 2: Generate selected accounts
+    // Step 2: Show proxy setup and then generate accounts
     async function generateSelectedAccounts() {
         console.log("Start Creation button clicked");
         
@@ -265,18 +265,158 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Switch to proxy tab to ensure user configures proxies
+        document.querySelector('a[href="#proxy"]').click();
+        
+        // Show proxy setup modal
+        showProxySetupModal(checkboxes.length);
+    }
+    
+    // Show proxy setup modal
+    function showProxySetupModal(emailCount) {
+        // Create modal if it doesn't exist
+        if (!document.getElementById('proxy-setup-modal')) {
+            const modal = document.createElement('div');
+            modal.id = 'proxy-setup-modal';
+            modal.className = 'modal';
+            
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h3 style="color: var(--primary-color);">Configure Proxies</h3>
+                        <button class="close-button" id="close-proxy-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin-bottom: 15px;">You need to configure at least one proxy to create Gmail accounts.</p>
+                        
+                        <div class="proxy-status-container" style="margin-bottom: 20px; padding: 15px; background-color: var(--background-light); border-radius: 8px;">
+                            <div class="proxy-status" id="proxy-status">
+                                <p><strong>Current Proxy Status:</strong></p>
+                                <ul style="margin-top: 10px; margin-left: 20px;">
+                                    <li id="proxy-enabled-status">Proxy: <span style="color: var(--danger-color);">Not Enabled</span></li>
+                                    <li id="proxy-count-status">Proxies Configured: <span>0</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <p>Please configure your proxies in the Proxy tab behind this dialog:</p>
+                        <ol style="margin-left: 20px; margin-top: 10px; margin-bottom: 20px;">
+                            <li>Check "Use Proxy (Recommended)"</li>
+                            <li>Select your proxy type (HTTP, SOCKS5, etc.)</li>
+                            <li>Enter at least one proxy in either the single proxy field or the proxy list</li>
+                        </ol>
+                        
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button id="check-proxy-setup" class="btn btn-primary" style="margin-right: 10px;">
+                                <i class="fas fa-check"></i> Check Proxy Setup
+                            </button>
+                            <button id="continue-without-proxy" class="btn btn-secondary">
+                                <i class="fas fa-exclamation-triangle"></i> Continue Without Proxy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Add event listeners
+            document.getElementById('close-proxy-modal').addEventListener('click', () => {
+                document.getElementById('proxy-setup-modal').classList.remove('active');
+            });
+            
+            document.getElementById('check-proxy-setup').addEventListener('click', () => {
+                updateProxyStatus();
+            });
+            
+            document.getElementById('continue-without-proxy').addEventListener('click', () => {
+                if (confirm('Creating Gmail accounts without proxies may result in IP bans. Are you sure you want to continue?')) {
+                    document.getElementById('proxy-setup-modal').classList.remove('active');
+                    useProxyCheckbox.checked = false;
+                    proceedWithAccountCreation(emailCount);
+                }
+            });
+        }
+        
+        // Update proxy status before showing modal
+        updateProxyStatus();
+        
+        // Show modal
+        document.getElementById('proxy-setup-modal').classList.add('active');
+    }
+    
+    // Update proxy status in the modal
+    function updateProxyStatus() {
+        const useProxy = useProxyCheckbox.checked;
+        const proxyAddress = proxyAddressInput.value.trim();
+        const proxyList = proxyListTextarea.value.trim();
+        
+        // Parse proxy list
+        let proxyListArray = [];
+        if (proxyList) {
+            proxyListArray = proxyList.split('\n').filter(line => line.trim());
+        }
+        
+        // Add single proxy to list if provided
+        if (proxyAddress && !proxyListArray.includes(proxyAddress)) {
+            proxyListArray.unshift(proxyAddress);
+        }
+        
+        // Update status elements
+        const proxyEnabledStatus = document.getElementById('proxy-enabled-status');
+        const proxyCountStatus = document.getElementById('proxy-count-status');
+        
+        if (useProxy) {
+            proxyEnabledStatus.innerHTML = `Proxy: <span style="color: var(--success-color);">Enabled</span>`;
+        } else {
+            proxyEnabledStatus.innerHTML = `Proxy: <span style="color: var(--danger-color);">Not Enabled</span>`;
+        }
+        
+        proxyCountStatus.innerHTML = `Proxies Configured: <span>${proxyListArray.length}</span>`;
+        
+        // If proxies are properly configured, show success message and enable continue button
+        if (useProxy && proxyListArray.length > 0) {
+            showNotification('Proxy setup verified! You can now proceed with account creation.', 'success');
+            
+            // Add a continue button
+            const continueBtn = document.createElement('button');
+            continueBtn.id = 'continue-with-proxy';
+            continueBtn.className = 'btn btn-success';
+            continueBtn.style.display = 'block';
+            continueBtn.style.margin = '20px auto 0';
+            continueBtn.style.padding = '10px 20px';
+            continueBtn.innerHTML = '<i class="fas fa-check-circle"></i> Continue with Account Creation';
+            
+            // Replace the check button with continue button
+            const checkBtn = document.getElementById('check-proxy-setup');
+            checkBtn.parentNode.replaceChild(continueBtn, checkBtn);
+            
+            // Add event listener
+            continueBtn.addEventListener('click', () => {
+                document.getElementById('proxy-setup-modal').classList.remove('active');
+                proceedWithAccountCreation(proxyListArray.length);
+            });
+        } else if (useProxy && proxyListArray.length === 0) {
+            showNotification('Please enter at least one proxy address', 'warning');
+        }
+    }
+    
+    // Step 3: Actually generate the accounts
+    async function proceedWithAccountCreation(emailCount) {
+        // Get selected emails
+        const checkboxes = document.querySelectorAll('.email-checkbox:checked');
+        const selectedEmails = Array.from(checkboxes).map(checkbox => {
+            const emailElement = checkbox.closest('.result-item').querySelector('.result-email');
+            return emailElement.textContent;
+        });
+        
         // Confirm with user
-        if (!confirm(`You are about to CREATE ${checkboxes.length} Gmail accounts. This will register actual accounts with Google. Continue?`)) {
+        if (!confirm(`You are about to CREATE ${selectedEmails.length} Gmail accounts. This will register actual accounts with Google. Continue?`)) {
             return;
         }
         
         // Force show browser to be checked
         showBrowserCheckbox.checked = true;
-        
-        const selectedEmails = Array.from(checkboxes).map(checkbox => {
-            const emailElement = checkbox.closest('.result-item').querySelector('.result-email');
-            return emailElement.textContent;
-        });
         
         // Get proxy settings
         const useProxy = useProxyCheckbox.checked;
@@ -287,22 +427,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const proxyAddress = proxyAddressInput.value.trim();
             const proxyList = proxyListTextarea.value.trim();
             const useProxyRotation = useProxyRotationCheckbox.checked;
-            
-            // Parse proxy list
-            let proxyListArray = [];
-            if (proxyList) {
-                proxyListArray = proxyList.split('\n').filter(line => line.trim());
-            }
-            
-            // Add single proxy to list if provided
-            if (proxyAddress && !proxyListArray.includes(proxyAddress)) {
-                proxyListArray.unshift(proxyAddress);
-            }
-            
-            if (proxyListArray.length === 0) {
-                showNotification('Please enter at least one proxy address', 'warning');
-                return;
-            }
             
             proxySettings = {
                 type: proxyType,
