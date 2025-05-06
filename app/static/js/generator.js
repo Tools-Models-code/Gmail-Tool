@@ -59,8 +59,143 @@ document.addEventListener('DOMContentLoaded', function() {
         parentEmailGroup.style.display = createChildAccountCheckbox.checked ? 'block' : 'none';
     });
     
-    // Initialize parent email visibility
-    document.getElementById('parent-email-group').style.display = createChildAccountCheckbox.checked ? 'block' : 'none';
+        // Initialize parent email visibility
+        document.getElementById('parent-email-group').style.display = createChildAccountCheckbox.checked ? 'block' : 'none';
+    
+        // Handle browser view button
+        const openBrowserWindowButton = document.getElementById('open-browser-window');
+        if (openBrowserWindowButton) {
+            openBrowserWindowButton.addEventListener('click', function() {
+                window.open('/browser-view', 'browserView', 'width=1200,height=800,resizable=yes');
+            });
+        }
+    
+        // Handle show browser screenshots button
+        const showBrowserScreenshotButton = document.getElementById('show-browser-screenshot');
+        const screenshotViewer = document.getElementById('screenshot-viewer');
+        if (showBrowserScreenshotButton && screenshotViewer) {
+            showBrowserScreenshotButton.addEventListener('click', function() {
+                if (screenshotViewer.style.display === 'none') {
+                    loadScreenshots();
+                    screenshotViewer.style.display = 'block';
+                } else {
+                    screenshotViewer.style.display = 'none';
+                }
+            });
+        }
+    
+        // Handle refresh screenshots button
+        const refreshScreenshotsButton = document.getElementById('refresh-screenshots');
+        if (refreshScreenshotsButton) {
+            refreshScreenshotsButton.addEventListener('click', loadScreenshots);
+        }
+    
+        // Screenshot navigation
+        let currentScreenshotIndex = 0;
+        let screenshotsList = [];
+    
+        const prevScreenshotButton = document.getElementById('prev-screenshot');
+        const nextScreenshotButton = document.getElementById('next-screenshot');
+        const screenshotCounter = document.getElementById('screenshot-counter');
+        const screenshotImage = document.getElementById('screenshot-image');
+        const screenshotDescription = document.getElementById('screenshot-description');
+        const screenshotTimestamp = document.getElementById('screenshot-timestamp');
+    
+        if (prevScreenshotButton) {
+            prevScreenshotButton.addEventListener('click', function() {
+                if (screenshotsList.length > 0) {
+                    currentScreenshotIndex = (currentScreenshotIndex - 1 + screenshotsList.length) % screenshotsList.length;
+                    displayScreenshot(currentScreenshotIndex);
+                }
+            });
+        }
+    
+        if (nextScreenshotButton) {
+            nextScreenshotButton.addEventListener('click', function() {
+                if (screenshotsList.length > 0) {
+                    currentScreenshotIndex = (currentScreenshotIndex + 1) % screenshotsList.length;
+                    displayScreenshot(currentScreenshotIndex);
+                }
+            });
+        }
+    
+        function loadScreenshots() {
+            // Get the current email for active email generation if any
+            let currentEmail = null;
+            const selectedEmails = Array.from(document.querySelectorAll('.email-checkbox:checked'))
+                .map(checkbox => {
+                    const emailItem = checkbox.closest('.result-item');
+                    if (emailItem) {
+                        const emailElement = emailItem.querySelector('.result-email');
+                        if (emailElement) {
+                            return emailElement.textContent;
+                        }
+                    }
+                    return null;
+                })
+                .filter(email => email !== null);
+        
+            if (selectedEmails.length > 0) {
+                currentEmail = selectedEmails[0];
+            }
+        
+            // Show loading indicator
+            screenshotDescription.textContent = "Loading screenshots...";
+            screenshotImage.src = "";
+        
+            // Fetch screenshots from API
+            fetch('/api/screenshots' + (currentEmail ? `?email=${encodeURIComponent(currentEmail)}` : ''))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.screenshots && data.screenshots.length > 0) {
+                        screenshotsList = data.screenshots.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+                        currentScreenshotIndex = screenshotsList.length - 1; // Show latest screenshot
+                        displayScreenshot(currentScreenshotIndex);
+                    } else {
+                        screenshotCounter.textContent = "0/0";
+                        screenshotDescription.textContent = "No screenshots available";
+                        screenshotTimestamp.textContent = "";
+                    }
+                })
+                .catch(error => {
+                    console.error("Error loading screenshots:", error);
+                    screenshotDescription.textContent = "Error loading screenshots";
+                });
+        }
+    
+        function displayScreenshot(index) {
+            if (screenshotsList.length === 0 || index < 0 || index >= screenshotsList.length) {
+                return;
+            }
+        
+            const screenshot = screenshotsList[index];
+        
+            // Update counter
+            screenshotCounter.textContent = `${index + 1}/${screenshotsList.length}`;
+        
+            // Update image source (base64 if available, otherwise URL)
+            if (screenshot.base64_data) {
+                screenshotImage.src = screenshot.base64_data;
+            } else {
+                screenshotImage.src = `/api/screenshot/${screenshot.filename}`;
+            }
+        
+            // Update description and timestamp
+            screenshotDescription.textContent = screenshot.description || "Screenshot";
+        
+            // Format timestamp
+            if (screenshot.timestamp) {
+                try {
+                    const date = new Date(screenshot.timestamp.replace(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6'));
+                    screenshotTimestamp.textContent = date.toLocaleString();
+                } catch (e) {
+                    screenshotTimestamp.textContent = screenshot.timestamp;
+                }
+            } else {
+                screenshotTimestamp.textContent = "";
+            }
+        }
+        
     
     // Test proxy button
     testProxyButton.addEventListener('click', async () => {

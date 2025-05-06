@@ -1,0 +1,140 @@
+/* Browser View Styles */
+
+.browser-view-container {
+    width: 100%;
+    padding: 20px;
+    background-color: var(--background-color);
+    border-radius: var(--border-radius);
+}
+
+.browser-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.browser-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.browser-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.vnc-container {
+    width: 100%;
+    height: 600px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    position: relative;
+}
+
+.vnc-container iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.vnc-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    z-index: 10;
+}
+
+.connection-info {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: var(--background-light);
+    border-radius: var(--border-radius);
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.status-connected {
+    background-color: var(--success-color);
+}
+
+.status-disconnected {
+    background-color: var(--error-color);
+}
+
+.controls-help {
+    margin-top: 20px;
+}
+
+.controls-help h4 {
+    margin-bottom: 10px;
+    color: var(--primary-color);
+}
+
+.controls-help ul {
+    list-style-type: disc;
+    margin-left: 20px;
+}
+
+.screenshot-gallery {
+    margin-top: 30px;
+}
+
+.screenshot-gallery h3 {
+    margin-bottom: 15px;
+    color: var(--primary-color);
+}
+
+.screenshots-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+}
+
+.screenshot-item {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.screenshot-img {
+    width: 100%;
+    height: 200px;
+    object-fit: contain;
+}
+
+.screenshot-info {
+    padding: 10px;
+    background-color: var(--background-light);
+}
+
+.screenshot-description {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.screenshot-timestamp {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}

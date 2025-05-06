@@ -2,12 +2,17 @@ import json
 import random
 import string
 import logging
-from flask import Blueprint, request, jsonify, current_app
+import os
+import base64
+from flask import Blueprint, request, jsonify, current_app, send_file
 from app.services.playwright_gmail_generator import PlaywrightGmailGenerator
 from app.services.proxy_manager import ProxyManager
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 logger = logging.getLogger(__name__)
+
+# Global instance of Gmail generator for sharing between requests
+gmail_generator = None
 
 @bp.route('/generate', methods=['POST'])
 def generate_accounts():
@@ -76,8 +81,11 @@ def generate_accounts():
         use_rotation=proxy_settings.get('use_rotation', True)
     )
     
-    # Initialize Gmail generator with Playwright
-    gmail_generator = PlaywrightGmailGenerator(proxy_manager)
+    # Use global gmail_generator to maintain state between requests
+    global gmail_generator
+    if gmail_generator is None:
+        # Initialize Gmail generator with Playwright if not already instantiated
+        gmail_generator = PlaywrightGmailGenerator(proxy_manager)
     
     # Configure generator settings
     gmail_generator.headless = headless
@@ -92,14 +100,109 @@ def generate_accounts():
         max_workers=max_workers
     )
     
+    # Include screenshots information in the response
+    screenshots_info = {}
+    if gmail_generator:
+        for result in results:
+            email = result.get('email')
+            if email:
+                screenshots_info[email] = gmail_generator.get_screenshots(email)
+    
     return jsonify({
         'results': results,
         'summary': {
             'total': len(results),
             'successful': sum(1 for r in results if r['success']),
             'failed': sum(1 for r in results if not r['success'])
-        }
+        },
+        'screenshots': screenshots_info
     })
+
+@bp.route('/screenshots', methods=['GET'])
+def get_screenshots():
+    """API endpoint to get available screenshots"""
+    global gmail_generator
+    
+    if not gmail_generator:
+        return jsonify({
+            'error': 'No screenshots available - Gmail generator not initialized',
+            'screenshots': []
+        }), 404
+    
+    # Get email filter parameter if provided
+    email = request.args.get('email', None)
+    
+    # Get all screenshots or filtered by email
+    screenshots = gmail_generator.get_screenshots(email)
+    
+    return jsonify({
+        'success': True,
+        'count': len(screenshots),
+        'screenshots': screenshots
+    })
+
+@bp.route('/display-stream', methods=['GET'])
+def get_display_stream():
+    """API endpoint to get display stream information"""
+    global gmail_generator
+    
+    if not gmail_generator:
+        return jsonify({
+            'error': 'Gmail generator not initialized',
+            'status': 'unavailable'
+        }), 404
+    
+    # Get display stream information
+    stream_info = gmail_generator.get_display_stream_info()
+    
+    return jsonify({
+        'success': True,
+        'stream': stream_info
+    })
+
+@bp.route('/screenshot/<filename>', methods=['GET'])
+def get_screenshot(filename):
+    """API endpoint to get a specific screenshot"""
+    global gmail_generator
+    
+    if not gmail_generator:
+        return jsonify({'error': 'Gmail generator not initialized'}), 404
+    
+    # Check if the screenshot exists
+    screenshot_path = os.path.join(gmail_generator.screenshots_dir, filename)
+    
+    if not os.path.exists(screenshot_path):
+        return jsonify({'error': 'Screenshot not found'}), 404
+    
+    # Return the image file
+    return send_file(screenshot_path, mimetype='image/png')
+
+@bp.route('/screenshot/base64/<filename>', methods=['GET'])
+def get_screenshot_base64(filename):
+    """API endpoint to get a specific screenshot as base64 encoded data"""
+    global gmail_generator
+    
+    if not gmail_generator:
+        return jsonify({'error': 'Gmail generator not initialized'}), 404
+    
+    # Check if the screenshot exists
+    screenshot_path = os.path.join(gmail_generator.screenshots_dir, filename)
+    
+    if not os.path.exists(screenshot_path):
+        return jsonify({'error': 'Screenshot not found'}), 404
+    
+    # Read the file and encode as base64
+    try:
+        with open(screenshot_path, 'rb') as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'base64_data': f'data:image/png;base64,{encoded_string}'
+        })
+    except Exception as e:
+        return jsonify({'error': f'Error encoding image: {str(e)}'}), 500
 
 @bp.route('/proxy/test', methods=['POST'])
 def test_proxy():
