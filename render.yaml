@@ -16,5 +16,4 @@ services:
     plan: free
     autoDeploy: false
     healthCheckPath: /
-    domains:
-      - backdoor-gmail-tool
+    # domains: [] # Optionally, leave empty or omit entirely
