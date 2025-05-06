@@ -113,30 +113,33 @@ class ProxyManager:
             proxies = self.get_proxies_dict(formatted_proxy)
             
             # Add a timeout to avoid hanging
-            timeout = 15
+            timeout = 8  # Reduced timeout to speed up testing
             
             # Use a test URL that returns HTTP status (faster than Google)
             test_url = 'https://httpbin.org/status/200'
             
             headers = {'User-Agent': self.get_user_agent()}
             
-            # First, perform a basic connectivity test
+            # First, perform a basic connectivity test with shorter timeout
             response = requests.get(
                 test_url,
                 proxies=proxies,
                 headers=headers,
                 timeout=timeout,
-                allow_redirects=True
+                allow_redirects=True,
+                verify=False  # Skip SSL verification for speed
             )
             
             if response.status_code == 200:
                 # If basic test passes, also try requesting Google to check for blocks
+                # but with an even shorter timeout
                 try:
                     google_response = requests.get(
                         'https://www.google.com/generate_204', 
                         proxies=proxies,
                         headers=headers,
-                        timeout=timeout
+                        timeout=timeout/2,  # Even shorter timeout for second test
+                        verify=False  # Skip SSL verification for speed
                     )
                     
                     if google_response.status_code < 400:
@@ -157,6 +160,8 @@ class ProxyManager:
             return False, "Proxy read timed out"
         except requests.exceptions.SSLError:
             return False, "SSL error with proxy (certificate verification failed)"
+        except requests.exceptions.InvalidURL:
+            return False, "Invalid proxy URL format"
         except Exception as e:
             return False, f"Proxy test failed: {str(e)}"
 

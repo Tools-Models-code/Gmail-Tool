@@ -219,6 +219,121 @@ main {
     border-radius: var(--border-radius);
     padding: 0.75rem 1rem;
     background-color: var(--background-dark);
+    margin-bottom: 1rem;
+}
+
+/* Detailed proxy results */
+.proxy-results-detail {
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: var(--background-dark);
+    border-radius: var(--border-radius);
+    padding: 0.75rem;
+    margin-top: 1rem;
+}
+
+.proxy-batch-header {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-muted);
+    font-style: italic;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.proxy-batch-results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.proxy-result {
+    display: flex;
+    padding: 0.5rem;
+    border-radius: var(--border-radius);
+    background-color: rgba(0, 0, 0, 0.1);
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.proxy-result:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.proxy-result.success {
+    border-left: 3px solid var(--success-color);
+}
+
+.proxy-result.failed {
+    border-left: 3px solid var(--danger-color);
+}
+
+.proxy-result-status {
+    margin-right: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.proxy-result.success .proxy-result-status i {
+    color: var(--success-color);
+}
+
+.proxy-result.failed .proxy-result-status i {
+    color: var(--danger-color);
+}
+
+.proxy-result-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.proxy-address {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.proxy-message {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.proxy-error {
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    color: var(--danger-color);
+    background-color: rgba(240, 71, 71, 0.1);
+    border-radius: var(--border-radius);
+}
+
+.proxy-test-summary-message {
+    padding: 0.75rem;
+    background-color: var(--background-dark);
+    border-radius: var(--border-radius);
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.proxy-test-summary-message p {
+    margin: 0;
+}
+
+.proxy-test-summary-message .btn {
+    white-space: nowrap;
+}
+
+#stop-proxy-tests {
+    background-color: var(--danger-color);
+    margin-left: 0.5rem;
+}
+
+#stop-proxy-tests:hover {
+    background-color: #d63b3b;
 }
 
 @media (max-width: 768px) {
@@ -229,6 +344,21 @@ main {
     .proxy-test-summary {
         flex-direction: column;
         gap: 0.5rem;
+    }
+    
+    .proxy-test-summary-message {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .proxy-test-summary-message .btn {
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+    
+    #stop-proxy-tests {
+        margin-left: 0;
+        margin-top: 0.5rem;
     }
 }
 
@@ -982,13 +1112,64 @@ main {
     color: var(--primary-color);
 }
 
-.browser-placeholder {
+.browser-frame {
     flex: 1;
     background-color: var(--background-light);
     border-radius: var(--border-radius);
     display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.browser-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 2;
+    background-color: var(--background-dark);
+}
+
+#browser-iframe {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    border: none;
+    z-index: 1;
+}
+
+.browser-controls {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.browser-loading {
+    margin: 15px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.browser-loading .spinner {
+    margin: 0 auto 10px;
+    width: 30px;
+    height: 30px;
+}
+
+.browser-notice {
+    margin-top: 15px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    max-width: 80%;
+    text-align: center;
 }
 
 .creation-log {

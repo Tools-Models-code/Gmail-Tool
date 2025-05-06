@@ -198,11 +198,27 @@
                             <div class="creation-content">
                                 <div class="browser-view-container">
                                     <h4><i class="fas fa-laptop"></i> Browser View</h4>
-                                    <div class="browser-placeholder" id="browser-placeholder">
-                                        <div class="empty-state">
-                                            <i class="fas fa-desktop"></i>
-                                            <p>The browser will appear here during the creation process</p>
+                                    <div class="browser-frame" id="browser-frame">
+                                        <iframe id="browser-iframe" src="about:blank" style="display: none;"></iframe>
+                                        <div class="browser-placeholder" id="browser-placeholder">
+                                            <div class="empty-state">
+                                                <i class="fas fa-desktop"></i>
+                                                <p>The browser is opening on your computer</p>
+                                                <div class="browser-loading">
+                                                    <div class="spinner"></div>
+                                                    <p>Please check your desktop for the browser window</p>
+                                                </div>
+                                                <p class="browser-notice">Due to security restrictions, the automation runs in a separate window</p>
+                                            </div>
                                         </div>
+                                    </div>
+                                    <div class="browser-controls">
+                                        <button id="show-browser-screenshot" class="btn btn-sm">
+                                            <i class="fas fa-camera"></i> Capture Browser Screenshot
+                                        </button>
+                                        <button id="open-browser-window" class="btn btn-sm" title="Opens a new window that shows the browser status">
+                                            <i class="fas fa-external-link-alt"></i> Open Status Window
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="creation-log-container">
