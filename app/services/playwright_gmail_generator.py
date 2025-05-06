@@ -375,7 +375,7 @@ class PlaywrightGmailGenerator:
                             self.logger.info(f"Successfully created account for {email}")
                             await browser.close()
                             return True, "Account created successfully"
-                except PlaywrightTimeoutError as e:
+                except PlaywrightTimeoutError:
                     # Check if we need manual intervention
                     message = "Automation couldn't proceed. Please complete the remaining steps manually. Then press Enter in the terminal to continue."
                     print(f"\n\033[93m{message}\033[0m")
@@ -387,20 +387,21 @@ class PlaywrightGmailGenerator:
                     self.logger.info(f"User confirmed manual completion for {email}")
                     await browser.close()
                     return True, "Account created with manual intervention"
-                # No duplicate exception handling needed - moved to proper place in the code
-            except Exception as e:
-                self.logger.error(f"Error creating account for {email}: {str(e)}")
                 
-                # Check if the error is related to missing browser
-                if "Executable doesn't exist" in str(e):
-                    return False, f"Error: {str(e)} - Please run 'playwright install' to download the required browsers."
-                return False, f"Error: {str(e)}"
-            finally:
-                # Close the browser
-                try:
-                    await browser.close()
-                except:
-                    pass
+        except Exception as e:
+            self.logger.error(f"Error creating account for {email}: {str(e)}")
+            
+            # Check if the error is related to missing browser
+            if "Executable doesn't exist" in str(e):
+                return False, f"Error: {str(e)} - Please run 'playwright install' to download the required browsers."
+            return False, f"Error: {str(e)}"
+        
+        finally:
+            # Close the browser
+            try:
+                await browser.close()
+            except Exception:
+                pass
     
     async def _safe_click(self, page, selector, max_attempts=3):
         """Safely click an element with retries"""
