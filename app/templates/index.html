@@ -45,6 +45,20 @@
                                 <label for="count">Number of Accounts</label>
                                 <input type="number" id="count" name="count" min="1" max="50" value="1">
                             </div>
+                            <div class="form-group checkbox">
+                                <input type="checkbox" id="create-child-account" name="create_child_account" checked>
+                                <label for="create-child-account">Create Child Account (Age 13-17)</label>
+                            </div>
+                            <div class="form-group" id="parent-email-group">
+                                <label for="parent-email">Parent Email (Optional)</label>
+                                <input type="email" id="parent-email" name="parent_email" placeholder="Enter parent email address">
+                                <small class="form-text">If left empty, you'll be prompted during account creation</small>
+                            </div>
+                            <div class="form-group checkbox">
+                                <input type="checkbox" id="show-browser" name="show_browser" checked>
+                                <label for="show-browser">Show Browser During Creation</label>
+                                <small class="form-text">Allows you to interact with the browser if automation fails</small>
+                            </div>
                             <div class="form-actions">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-play"></i> Generate Accounts
@@ -111,9 +125,7 @@
                                     <button id="export-selected" class="btn btn-sm">
                                         <i class="fas fa-file-export"></i> Export
                                     </button>
-                                    <button id="generate-selected" class="btn btn-primary" style="display: none;">
-                                        <i class="fas fa-cog"></i> Generate Selected
-                                    </button>
+                                    <!-- Generate selected button will be added dynamically by JavaScript -->
                                 </div>
                             </div>
                             <div class="results-summary">
@@ -152,6 +164,7 @@
             <div class="progress-bar" id="progress-bar"></div>
         </div>
         <p id="progress-text">0/0 accounts</p>
+        <p class="modal-note">If prompted, please interact with the browser window and follow the instructions in the terminal.</p>
     </div>
 </div>
 {% endblock %}

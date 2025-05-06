@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const useRandomPrefixCheckbox = document.getElementById('use-random-prefix');
     const passwordInput = document.getElementById('password');
     const countInput = document.getElementById('count');
+    const createChildAccountCheckbox = document.getElementById('create-child-account');
+    const parentEmailInput = document.getElementById('parent-email');
+    const showBrowserCheckbox = document.getElementById('show-browser');
     const useProxyCheckbox = document.getElementById('use-proxy');
     const proxySettings = document.querySelector('.proxy-settings');
     const proxyTypeSelect = document.getElementById('proxy-type');
@@ -49,6 +52,15 @@ document.addEventListener('DOMContentLoaded', function() {
     useProxyCheckbox.addEventListener('change', () => {
         proxySettings.style.display = useProxyCheckbox.checked ? 'block' : 'none';
     });
+    
+    // Toggle parent email field based on child account checkbox
+    createChildAccountCheckbox.addEventListener('change', () => {
+        const parentEmailGroup = document.getElementById('parent-email-group');
+        parentEmailGroup.style.display = createChildAccountCheckbox.checked ? 'block' : 'none';
+    });
+    
+    // Initialize parent email visibility
+    document.getElementById('parent-email-group').style.display = createChildAccountCheckbox.checked ? 'block' : 'none';
     
     // Test proxy button
     testProxyButton.addEventListener('click', async () => {
@@ -151,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
             resultItem.className = 'result-item preview';
             resultItem.innerHTML = `
                 <div class="checkbox">
-                    <input type="checkbox" id="email-${i}" class="email-checkbox" checked>
+                    <input type="checkbox" id="email-${i}" class="email-checkbox">
                     <label for="email-${i}"></label>
                 </div>
                 <div class="result-details">
@@ -174,14 +186,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const generateBtn = document.createElement('button');
             generateBtn.id = 'generate-selected';
             generateBtn.className = 'btn btn-primary';
-            generateBtn.innerHTML = '<i class="fas fa-cog"></i> Generate Selected';
+            generateBtn.innerHTML = '<i class="fas fa-cog"></i> Create Selected Accounts';
             actionsDiv.appendChild(generateBtn);
             
             // Add event listener to the new button
             generateBtn.addEventListener('click', generateSelectedAccounts);
         } else {
             // Show the button if it exists
-            document.getElementById('generate-selected').style.display = 'inline-block';
+            const generateBtn = document.getElementById('generate-selected');
+            generateBtn.style.display = 'inline-block';
+            generateBtn.innerHTML = '<i class="fas fa-cog"></i> Create Selected Accounts';
         }
         
         // Remove empty state if present
@@ -193,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Switch to results tab
         resultsTab.click();
         
-        showNotification(`Generated ${count} email previews. Select which ones to create.`, 'success');
+        showNotification(`Generated ${count} email previews. Please select which ones to create and click the "Create Selected Accounts" button.`, 'success');
     });
     
     // Step 2: Generate selected accounts
@@ -202,6 +216,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const checkboxes = document.querySelectorAll('.email-checkbox:checked');
         if (checkboxes.length === 0) {
             showNotification('Please select at least one email to generate', 'warning');
+            return;
+        }
+        
+        // Confirm with user
+        if (!confirm(`You are about to create ${checkboxes.length} Gmail accounts. Continue?`)) {
             return;
         }
         
@@ -257,7 +276,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     password: passwordInput.value,
                     selected_emails: selectedEmails,
-                    proxy_settings: proxySettings
+                    proxy_settings: proxySettings,
+                    parent_email: parentEmailInput.value.trim(),
+                    headless: !showBrowserCheckbox.checked
                 })
             });
             

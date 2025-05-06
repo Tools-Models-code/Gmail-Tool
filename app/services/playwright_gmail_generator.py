@@ -2,14 +2,13 @@ import time
 import random
 import string
 import logging
-import requests
-import threading
 import asyncio
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from fake_useragent import UserAgent
 
-class GmailGenerator:
+class PlaywrightGmailGenerator:
     """Service for generating Gmail accounts using Playwright"""
     
     def __init__(self, proxy_manager=None):

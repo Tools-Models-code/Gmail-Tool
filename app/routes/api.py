@@ -3,7 +3,7 @@ import random
 import string
 import logging
 from flask import Blueprint, request, jsonify, current_app
-from app.services.gmail_generator import GmailGenerator
+from app.services.playwright_gmail_generator import PlaywrightGmailGenerator
 from app.services.proxy_manager import ProxyManager
 
 bp = Blueprint('api', __name__, url_prefix='/api')
@@ -24,6 +24,8 @@ def generate_accounts():
     count = int(data.get('count', 1))
     selected_emails = data.get('selected_emails', [])
     proxy_settings = data.get('proxy_settings', {})
+    parent_email = data.get('parent_email', '')  # Parent email for child account
+    headless = data.get('headless', False)  # Whether to run in headless mode
     
     # Validate required fields
     if not password:
@@ -68,12 +70,21 @@ def generate_accounts():
         use_rotation=proxy_settings.get('use_rotation', True)
     )
     
-    # Initialize Gmail generator
-    gmail_generator = GmailGenerator(proxy_manager)
+    # Initialize Gmail generator with Playwright
+    gmail_generator = PlaywrightGmailGenerator(proxy_manager)
+    
+    # Configure generator settings
+    gmail_generator.headless = headless
+    gmail_generator.default_phone_number = "8145125262"  # Set default phone number
     
     # Generate accounts in batch
     max_workers = min(3, len(email_list))  # Limit parallel workers
-    results = gmail_generator.create_accounts_batch(email_list, password, max_workers)
+    results = gmail_generator.create_accounts_batch(
+        email_list, 
+        password, 
+        parent_email=parent_email,
+        max_workers=max_workers
+    )
     
     return jsonify({
         'results': results,
