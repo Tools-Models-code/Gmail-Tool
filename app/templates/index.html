@@ -70,6 +70,15 @@
                         </form>
                     </div>
                     <div class="tab-pane" id="proxy">
+                        <div class="info-box" style="background-color: var(--background-light); padding: 15px; border-radius: var(--border-radius); margin-bottom: 20px;">
+                            <h3 style="margin-bottom: 10px; color: var(--warning-color);"><i class="fas fa-exclamation-triangle"></i> Important: Proxy Setup Required</h3>
+                            <p>Gmail account creation requires proxies to avoid IP bans. You must configure at least one proxy before creating accounts.</p>
+                            <ol style="margin-left: 20px; margin-top: 10px;">
+                                <li>Enter at least one proxy in either the single proxy field or the proxy list below</li>
+                                <li>After selecting emails in the Results tab, you'll be prompted to verify your proxy setup</li>
+                                <li>You can test your proxy connection using the Test button</li>
+                            </ol>
+                        </div>
                         <form id="proxy-form">
                             <div class="form-group checkbox">
                                 <input type="checkbox" id="use-proxy" name="use_proxy" checked>
@@ -101,6 +110,7 @@
                                 <div class="form-group checkbox">
                                     <input type="checkbox" id="use-proxy-rotation" name="use_proxy_rotation" checked>
                                     <label for="use-proxy-rotation">Use Proxy Rotation</label>
+                                    <small class="form-text">Automatically rotate through proxies for each account creation</small>
                                 </div>
                                 <div class="form-group">
                                     <button type="button" id="import-proxies" class="btn btn-secondary">
@@ -159,12 +169,20 @@
 <div class="modal" id="loading-modal">
     <div class="modal-content">
         <div class="spinner"></div>
-        <p>Generating accounts...</p>
+        <h3 style="margin-bottom: 15px; color: var(--primary-color);">Creating Gmail Accounts...</h3>
         <div class="progress-container">
             <div class="progress-bar" id="progress-bar"></div>
         </div>
         <p id="progress-text">0/0 accounts</p>
-        <p class="modal-note">If prompted, please interact with the browser window and follow the instructions in the terminal.</p>
+        <div class="modal-note" style="margin-top: 20px; padding: 15px; background-color: var(--background-light); border-radius: 8px;">
+            <p><strong>Important:</strong></p>
+            <ul style="text-align: left; margin-top: 10px; margin-left: 20px;">
+                <li>A browser window will open for you to interact with</li>
+                <li>You may need to solve CAPTCHA or verification challenges</li>
+                <li>Follow any prompts that appear in the browser</li>
+                <li>Do not close the browser until the process is complete</li>
+            </ul>
+        </div>
     </div>
 </div>
 {% endblock %}

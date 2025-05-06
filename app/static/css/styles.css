@@ -418,6 +418,65 @@ main {
 
 .result-item.preview {
     border-left: 4px solid var(--primary-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.result-item.preview:hover {
+    background-color: var(--background-light);
+}
+
+/* Improve checkbox visibility */
+.checkbox input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    border: 2px solid var(--primary-color);
+    border-radius: 4px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: var(--background-light);
+    position: relative;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.checkbox input[type="checkbox"]:checked {
+    background-color: var(--primary-color);
+}
+
+.checkbox input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    color: white;
+    font-size: 18px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Highlight selected email items */
+.result-item.preview:has(input[type="checkbox"]:checked) {
+    background-color: rgba(114, 137, 218, 0.2);
+    border-left: 4px solid var(--success-color);
+}
+
+/* Style for the Create Selected Accounts button */
+#generate-selected {
+    background-color: var(--success-color);
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+#generate-selected:hover {
+    background-color: #3a9c6f;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
 }
 
 .result-checkbox {
@@ -636,6 +695,82 @@ main {
     color: var(--primary-color);
     position: absolute;
     left: -1.5rem;
+}
+
+/* Proxy Setup Modal */
+#proxy-setup-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+#proxy-setup-modal.active {
+    display: flex;
+}
+
+#proxy-setup-modal .modal-content {
+    background-color: var(--background-dark);
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+#proxy-setup-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--background-light);
+}
+
+#proxy-setup-modal .modal-body {
+    padding: 1.5rem;
+}
+
+#proxy-setup-modal .close-button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: color var(--transition-speed);
+}
+
+#proxy-setup-modal .close-button:hover {
+    color: var(--text-color);
+}
+
+#continue-with-proxy {
+    background-color: var(--success-color);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all var(--transition-speed);
+    font-weight: bold;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+#continue-with-proxy:hover {
+    background-color: #36a66e;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Footer */
