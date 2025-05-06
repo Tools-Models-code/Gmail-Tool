@@ -1,0 +1,253 @@
+{% extends "layout.html" %}
+
+{% block title %}Browser View - Gmail Account Generation{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-desktop"></i> Live Browser View</h2>
+            <div class="header-actions">
+                <a href="{{ url_for('main.index') }}" class="btn btn-sm">
+                    <i class="fas fa-arrow-left"></i> Back to Generator
+                </a>
+                <button id="reload-viewer" class="btn btn-sm">
+                    <i class="fas fa-sync"></i> Reload Viewer
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="info-box">
+                <h3><i class="fas fa-info-circle"></i> Browser Information</h3>
+                <p>You are viewing the live browser window used for Gmail account creation. You can see the automation in real-time.</p>
+                <p>If you don't see the browser or connection fails, try reloading the viewer or checking connection status below.</p>
+            </div>
+            
+            <div class="browser-viewer-container">
+                <div class="browser-controls">
+                    <div class="connection-status">
+                        <span class="status-label">Connection:</span>
+                        <span id="connection-status" class="status-value status-disconnected">Disconnected</span>
+                    </div>
+                    <div class="control-actions">
+                        <button id="fullscreen-btn" class="btn btn-sm">
+                            <i class="fas fa-expand"></i> Fullscreen
+                        </button>
+                        <button id="reconnect-btn" class="btn btn-sm">
+                            <i class="fas fa-plug"></i> Reconnect
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="vnc-container">
+                    <!-- Display loading message until iframe loads -->
+                    <div id="loading-display" class="loading-display">
+                        <div class="spinner"></div>
+                        <p>Connecting to browser display...</p>
+                    </div>
+                    
+                    <!-- noVNC iframe -->
+                    <iframe 
+                        id="vnc-iframe" 
+                        src="/vnc-viewer" 
+                        frameborder="0"
+                        allowfullscreen="true"
+                        webkitallowfullscreen="true"
+                        mozallowfullscreen="true"
+                        oallowfullscreen="true"
+                        msallowfullscreen="true">
+                    </iframe>
+                </div>
+                
+                <div class="usage-instructions">
+                    <h4><i class="fas fa-hand-pointer"></i> Interaction Instructions</h4>
+                    <ul>
+                        <li>You can directly control the browser by clicking in the display area</li>
+                        <li>Click anywhere in the browser window to focus and interact</li>
+                        <li>Use your keyboard and mouse normally to interact with the remote browser</li>
+                        <li>If the browser seems frozen, try clicking the Reconnect button</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .header-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    
+    .browser-viewer-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        width: 100%;
+    }
+    
+    .browser-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .connection-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .status-value {
+        font-weight: bold;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+    
+    .status-connected {
+        background-color: var(--success-color);
+        color: white;
+    }
+    
+    .status-disconnected {
+        background-color: var(--error-color);
+        color: white;
+    }
+    
+    .control-actions {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .vnc-container {
+        position: relative;
+        width: 100%;
+        height: 600px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        overflow: hidden;
+    }
+    
+    #vnc-iframe {
+        width: 100%;
+        height: 100%;
+        background-color: #1a1a1a;
+    }
+    
+    .loading-display {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        z-index: 2;
+    }
+    
+    .usage-instructions {
+        background-color: var(--background-light);
+        border-radius: var(--border-radius);
+        padding: 15px;
+    }
+    
+    .usage-instructions h4 {
+        margin-bottom: 10px;
+    }
+    
+    .usage-instructions ul {
+        margin-left: 20px;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const iframe = document.getElementById('vnc-iframe');
+    const loadingDisplay = document.getElementById('loading-display');
+    const connectionStatus = document.getElementById('connection-status');
+    const reconnectBtn = document.getElementById('reconnect-btn');
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    const reloadViewerBtn = document.getElementById('reload-viewer');
+    
+    // Check connection status periodically
+    let connectionChecker;
+    
+    // Start connection status checker
+    function startConnectionChecker() {
+        connectionChecker = setInterval(checkConnectionStatus, 5000);
+        checkConnectionStatus(); // Check immediately
+    }
+    
+    // Check VNC connection status
+    function checkConnectionStatus() {
+        fetch('/api/display-stream')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.stream.status === 'running') {
+                    connectionStatus.textContent = 'Connected';
+                    connectionStatus.classList.remove('status-disconnected');
+                    connectionStatus.classList.add('status-connected');
+                    loadingDisplay.style.display = 'none';
+                } else {
+                    connectionStatus.textContent = 'Disconnected';
+                    connectionStatus.classList.remove('status-connected');
+                    connectionStatus.classList.add('status-disconnected');
+                    loadingDisplay.style.display = 'flex';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking connection status:', error);
+                connectionStatus.textContent = 'Error';
+                connectionStatus.classList.remove('status-connected');
+                connectionStatus.classList.add('status-disconnected');
+            });
+    }
+    
+    // Handle iframe loaded
+    iframe.addEventListener('load', function() {
+        // Hide loading display after iframe is loaded
+        loadingDisplay.style.display = 'none';
+    });
+    
+    // Handle reconnect button
+    reconnectBtn.addEventListener('click', function() {
+        loadingDisplay.style.display = 'flex';
+        iframe.src = iframe.src; // Reload iframe
+    });
+    
+    // Handle reload viewer button
+    reloadViewerBtn.addEventListener('click', function() {
+        loadingDisplay.style.display = 'flex';
+        window.location.reload();
+    });
+    
+    // Handle fullscreen button
+    fullscreenBtn.addEventListener('click', function() {
+        const vncContainer = document.querySelector('.vnc-container');
+        
+        if (vncContainer.requestFullscreen) {
+            vncContainer.requestFullscreen();
+        } else if (vncContainer.webkitRequestFullscreen) {
+            vncContainer.webkitRequestFullscreen();
+        } else if (vncContainer.msRequestFullscreen) {
+            vncContainer.msRequestFullscreen();
+        }
+    });
+    
+    // Start the connection checker
+    startConnectionChecker();
+    
+    // Clean up when leaving the page
+    window.addEventListener('beforeunload', function() {
+        clearInterval(connectionChecker);
+    });
+});
+</script>
+{% endblock %}
