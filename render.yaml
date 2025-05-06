@@ -6,6 +6,11 @@ services:
       # Make sure we're in the right directory
       echo "Current directory: $(pwd)"
       
+      # Install system dependencies required for VNC
+      echo "Installing system dependencies..."
+      apt-get update -y || true
+      apt-get install -y x11vnc xvfb git || true
+      
       # Create and activate virtual environment
       python -m venv .venv
       source .venv/bin/activate
@@ -14,9 +19,11 @@ services:
       pip install --upgrade pip
       
       # Install critical dependencies explicitly first
-      echo "Installing Flask and Gunicorn..."
+      echo "Installing Flask and dependencies..."
       pip install Flask==2.2.5
+      pip install flask-cors==4.0.0
       pip install gunicorn==21.2.0
+      pip install websockify==0.10.0
       
       # Install Python requirements
       echo "Installing all requirements..."

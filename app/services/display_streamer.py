@@ -38,7 +38,7 @@ class DisplayStreamer:
         """Start the VNC server and WebSocket proxy"""
         if self.running:
             logger.info("Display streamer already running")
-            return
+            return True
         
         try:
             # Ensure we have a valid DISPLAY environment variable
@@ -48,40 +48,56 @@ class DisplayStreamer:
             display = os.environ.get('DISPLAY', f":{self.display_num}")
             logger.info(f"Starting VNC server for display {display}")
             
-            # Install x11vnc if it's not installed
-            self._ensure_vnc_server_installed()
+            # Try to ensure x11vnc is installed
+            vnc_available = self._ensure_vnc_server_installed()
             
-            # Start x11vnc server
-            vnc_cmd = [
-                'x11vnc',
-                '-display', display,
-                '-forever',
-                '-shared',
-                '-rfbport', str(self.vnc_port),
-                '-norc',  # No configuration file
-                '-nopw',  # No password (only for internal use)
-                '-quiet',  # Less verbose
-                '-localhost'  # Only listen on localhost
-            ]
+            if vnc_available:
+                # Start x11vnc server
+                vnc_cmd = [
+                    'x11vnc',
+                    '-display', display,
+                    '-forever',
+                    '-shared',
+                    '-rfbport', str(self.vnc_port),
+                    '-norc',  # No configuration file
+                    '-nopw',  # No password (only for internal use)
+                    '-quiet',  # Less verbose
+                    '-localhost'  # Only listen on localhost
+                ]
+                
+                try:
+                    self.vnc_process = subprocess.Popen(
+                        vnc_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    logger.info(f"VNC server started on port {self.vnc_port}")
+                except Exception as vnc_error:
+                    logger.error(f"Failed to start VNC server: {str(vnc_error)}")
+                    # Continue without VNC server - just for screenshots
+                    vnc_available = False
+            else:
+                logger.warning("VNC server not available. Continuing with limited functionality.")
             
-            self.vnc_process = subprocess.Popen(
-                vnc_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            # Setup noVNC WebSocket proxy only if VNC is available
+            if vnc_available:
+                websockify_available = self._setup_novnc()
+            else:
+                websockify_available = False
+                logger.warning("Skipping WebSocket proxy setup since VNC is not available.")
             
-            logger.info(f"VNC server started on port {self.vnc_port}")
-            
-            # Setup noVNC WebSocket proxy
-            self._setup_novnc()
-            
-            # Start monitoring thread
+            # We're running even if just in screenshot mode without VNC
             self.running = True
-            self.status_thread = threading.Thread(target=self._monitor_services)
-            self.status_thread.daemon = True
-            self.status_thread.start()
             
-            logger.info("Display streamer started successfully")
+            # Start monitoring thread only if VNC is available
+            if vnc_available:
+                self.status_thread = threading.Thread(target=self._monitor_services)
+                self.status_thread.daemon = True
+                self.status_thread.start()
+                logger.info("Display streamer started successfully with VNC")
+            else:
+                logger.info("Display streamer started in screenshot-only mode")
+            
             return True
         except Exception as e:
             logger.error(f"Error starting display streamer: {str(e)}")
@@ -117,19 +133,37 @@ class DisplayStreamer:
         try:
             subprocess.run(['which', 'x11vnc'], check=True, stdout=subprocess.PIPE)
             logger.info("x11vnc is already installed")
+            return True
         except subprocess.CalledProcessError:
-            logger.info("Installing x11vnc...")
+            logger.info("x11vnc not found. Checking if we can install it...")
+            
+            # First, check if we have sudo/root access
+            has_admin_access = False
             try:
-                # Try apt (Debian/Ubuntu)
-                subprocess.run(['apt-get', 'update', '-y'], check=True)
-                subprocess.run(['apt-get', 'install', '-y', 'x11vnc'], check=True)
-            except subprocess.CalledProcessError:
+                # Try a simple command that requires admin rights
+                subprocess.run(['sudo', '-n', 'true'], check=True, stderr=subprocess.PIPE)
+                has_admin_access = True
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                logger.warning("No admin rights detected. Will try to continue without installing x11vnc.")
+            
+            if has_admin_access:
+                logger.info("Installing x11vnc...")
                 try:
-                    # Try yum (RHEL/CentOS)
-                    subprocess.run(['yum', 'install', '-y', 'x11vnc'], check=True)
+                    # Try apt (Debian/Ubuntu)
+                    subprocess.run(['sudo', 'apt-get', 'update', '-y'], check=True)
+                    subprocess.run(['sudo', 'apt-get', 'install', '-y', 'x11vnc'], check=True)
+                    return True
                 except subprocess.CalledProcessError:
-                    logger.error("Could not install x11vnc. Please install it manually.")
-                    raise RuntimeError("x11vnc installation failed")
+                    try:
+                        # Try yum (RHEL/CentOS)
+                        subprocess.run(['sudo', 'yum', 'install', '-y', 'x11vnc'], check=True)
+                        return True
+                    except subprocess.CalledProcessError:
+                        logger.error("Could not install x11vnc. Will try to continue without it.")
+            
+            # Fall back to trying without x11vnc by using alternative VNC implementations or mock
+            logger.warning("Running without x11vnc. VNC functionality will be limited.")
+            return False
     
     def _setup_novnc(self):
         """Set up noVNC for browser-based VNC viewing"""
@@ -201,10 +235,30 @@ class DisplayStreamer:
     
     def get_connection_info(self):
         """Get connection information for the VNC stream"""
+        # Check if VNC process is actually running
+        vnc_running = self.vnc_process is not None and self.vnc_process.poll() is None
+        # Check if websockify process is actually running
+        websockify_running = self.websockify_process is not None and self.websockify_process.poll() is None
+        
         base_url = f"/vnc/?host=localhost&port={self.websockify_port}"
+        
+        status = "unavailable"
+        message = ""
+        
+        if not vnc_running and not websockify_running:
+            status = "screenshot_only"
+            message = "VNC server not available. Running in screenshot-only mode."
+        elif vnc_running and not websockify_running:
+            status = "partial"
+            message = "VNC server running but WebSocket proxy not available."
+        elif vnc_running and websockify_running:
+            status = "running"
+            message = "VNC stream available."
+        
         return {
             'vnc_port': self.vnc_port,
             'websocket_port': self.websockify_port,
-            'url': base_url,
-            'status': 'running' if self.running else 'stopped'
+            'url': base_url if status == "running" else None,
+            'status': status,
+            'message': message
         }

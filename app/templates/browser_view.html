@@ -28,6 +28,11 @@
                     <div class="connection-status">
                         <span class="status-label">Connection:</span>
                         <span id="connection-status" class="status-value status-disconnected">Disconnected</span>
+                        <span id="connection-message" class="status-message"></span>
+                    </div>
+                    <div class="fallback-message" id="fallback-message" style="display: none;">
+                        <p><i class="fas fa-exclamation-triangle"></i> VNC streaming is not available in this environment.</p>
+                        <p>Using screenshot mode instead. You can still see browser activity through captured screenshots.</p>
                     </div>
                     <div class="control-actions">
                         <button id="fullscreen-btn" class="btn btn-sm">
@@ -190,16 +195,66 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('/api/display-stream')
             .then(response => response.json())
             .then(data => {
-                if (data.success && data.stream.status === 'running') {
-                    connectionStatus.textContent = 'Connected';
-                    connectionStatus.classList.remove('status-disconnected');
-                    connectionStatus.classList.add('status-connected');
-                    loadingDisplay.style.display = 'none';
+                const connectionMessage = document.getElementById('connection-message');
+                const fallbackMessage = document.getElementById('fallback-message');
+                const fullscreenBtn = document.getElementById('fullscreen-btn');
+                
+                if (data.success) {
+                    // Handle different status cases
+                    switch(data.stream.status) {
+                        case 'running':
+                            // Full VNC connection available
+                            connectionStatus.textContent = 'Connected';
+                            connectionStatus.classList.remove('status-disconnected');
+                            connectionStatus.classList.add('status-connected');
+                            loadingDisplay.style.display = 'none';
+                            fallbackMessage.style.display = 'none';
+                            connectionMessage.textContent = data.stream.message || '';
+                            break;
+                            
+                        case 'partial':
+                            // VNC running but WebSocket not available
+                            connectionStatus.textContent = 'Partial';
+                            connectionStatus.classList.remove('status-connected');
+                            connectionStatus.classList.add('status-disconnected');
+                            loadingDisplay.style.display = 'flex';
+                            loadingDisplay.querySelector('p').textContent = 'WebSocket proxy not available';
+                            fallbackMessage.style.display = 'block';
+                            connectionMessage.textContent = data.stream.message || '';
+                            break;
+                            
+                        case 'screenshot_only':
+                            // No VNC available, only screenshots
+                            connectionStatus.textContent = 'Screenshots Only';
+                            connectionStatus.classList.remove('status-connected');
+                            connectionStatus.classList.add('status-disconnected');
+                            loadingDisplay.style.display = 'flex';
+                            loadingDisplay.querySelector('p').textContent = 'VNC not available in this environment';
+                            fallbackMessage.style.display = 'block';
+                            if (fullscreenBtn) fullscreenBtn.disabled = true;
+                            connectionMessage.textContent = data.stream.message || '';
+                            
+                            // Load screenshots as fallback
+                            loadScreenshots();
+                            break;
+                            
+                        default:
+                            // Unavailable or unknown status
+                            connectionStatus.textContent = 'Unavailable';
+                            connectionStatus.classList.remove('status-connected');
+                            connectionStatus.classList.add('status-disconnected');
+                            loadingDisplay.style.display = 'flex';
+                            fallbackMessage.style.display = 'block';
+                            connectionMessage.textContent = data.stream.message || 'VNC service unavailable';
+                    }
                 } else {
-                    connectionStatus.textContent = 'Disconnected';
+                    // API call was successful but returned error
+                    connectionStatus.textContent = 'Error';
                     connectionStatus.classList.remove('status-connected');
                     connectionStatus.classList.add('status-disconnected');
                     loadingDisplay.style.display = 'flex';
+                    connectionMessage.textContent = data.error || 'Unknown error';
+                    fallbackMessage.style.display = 'block';
                 }
             })
             .catch(error => {
@@ -207,6 +262,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 connectionStatus.textContent = 'Error';
                 connectionStatus.classList.remove('status-connected');
                 connectionStatus.classList.add('status-disconnected');
+                document.getElementById('connection-message').textContent = 'Failed to check connection';
+                loadingDisplay.style.display = 'flex';
             });
     }
     
@@ -240,6 +297,178 @@ document.addEventListener('DOMContentLoaded', function() {
             vncContainer.msRequestFullscreen();
         }
     });
+    
+    // Function to load screenshots as fallback
+    function loadScreenshots() {
+        // Create or get the screenshots container
+        let screenshotsContainer = document.getElementById('screenshots-container');
+        if (!screenshotsContainer) {
+            // Create screenshots section if it doesn't exist
+            const vncContainer = document.querySelector('.vnc-container');
+            screenshotsContainer = document.createElement('div');
+            screenshotsContainer.id = 'screenshots-container';
+            screenshotsContainer.className = 'screenshots-container';
+            screenshotsContainer.innerHTML = `
+                <h3><i class="fas fa-camera"></i> Browser Screenshots</h3>
+                <div class="screenshot-navigation">
+                    <button id="prev-screenshot-btn" class="btn btn-sm">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <span id="screenshot-counter">0/0</span>
+                    <button id="next-screenshot-btn" class="btn btn-sm">
+                        <i class="fas fa-chevron-right"></i> Next
+                    </button>
+                </div>
+                <div class="screenshot-display">
+                    <img id="screenshot-img" src="" alt="Browser Screenshot">
+                </div>
+                <div class="screenshot-info">
+                    <p id="screenshot-description">No screenshots available</p>
+                    <p id="screenshot-timestamp" class="timestamp"></p>
+                </div>
+                <button id="refresh-screenshots-btn" class="btn btn-primary">
+                    <i class="fas fa-sync"></i> Refresh Screenshots
+                </button>
+            `;
+            vncContainer.parentNode.insertBefore(screenshotsContainer, vncContainer.nextSibling);
+            
+            // Add event listeners for the new controls
+            document.getElementById('prev-screenshot-btn').addEventListener('click', showPreviousScreenshot);
+            document.getElementById('next-screenshot-btn').addEventListener('click', showNextScreenshot);
+            document.getElementById('refresh-screenshots-btn').addEventListener('click', fetchScreenshots);
+        }
+        
+        // Fetch screenshots
+        fetchScreenshots();
+    }
+    
+    let screenshots = [];
+    let currentScreenshotIndex = 0;
+    
+    function fetchScreenshots() {
+        fetch('/api/screenshots')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.screenshots && data.screenshots.length > 0) {
+                    screenshots = data.screenshots.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+                    currentScreenshotIndex = screenshots.length - 1; // Show the latest screenshot
+                    updateScreenshotDisplay();
+                } else {
+                    document.getElementById('screenshot-counter').textContent = '0/0';
+                    document.getElementById('screenshot-description').textContent = 'No screenshots available';
+                    document.getElementById('screenshot-timestamp').textContent = '';
+                    document.getElementById('screenshot-img').src = '';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching screenshots:', error);
+                document.getElementById('screenshot-description').textContent = 'Error loading screenshots';
+            });
+    }
+    
+    function updateScreenshotDisplay() {
+        if (screenshots.length === 0) return;
+        
+        const screenshot = screenshots[currentScreenshotIndex];
+        const counterElem = document.getElementById('screenshot-counter');
+        const imgElem = document.getElementById('screenshot-img');
+        const descElem = document.getElementById('screenshot-description');
+        const timeElem = document.getElementById('screenshot-timestamp');
+        
+        counterElem.textContent = `${currentScreenshotIndex + 1}/${screenshots.length}`;
+        
+        if (screenshot.base64_data) {
+            imgElem.src = screenshot.base64_data;
+        } else {
+            imgElem.src = `/api/screenshot/${screenshot.filename}`;
+        }
+        
+        descElem.textContent = screenshot.description || 'Screenshot';
+        
+        // Format timestamp
+        if (screenshot.timestamp) {
+            try {
+                const date = new Date(screenshot.timestamp.replace(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6'));
+                timeElem.textContent = date.toLocaleString();
+            } catch (e) {
+                timeElem.textContent = screenshot.timestamp;
+            }
+        } else {
+            timeElem.textContent = '';
+        }
+    }
+    
+    function showPreviousScreenshot() {
+        if (screenshots.length === 0) return;
+        currentScreenshotIndex = (currentScreenshotIndex - 1 + screenshots.length) % screenshots.length;
+        updateScreenshotDisplay();
+    }
+    
+    function showNextScreenshot() {
+        if (screenshots.length === 0) return;
+        currentScreenshotIndex = (currentScreenshotIndex + 1) % screenshots.length;
+        updateScreenshotDisplay();
+    }
+    
+    // Add style for new elements
+    const style = document.createElement('style');
+    style.textContent = `
+        .status-message {
+            margin-left: 10px;
+            font-size: 0.9em;
+            color: var(--text-muted);
+        }
+        
+        .fallback-message {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: var(--warning-color-light, #fff3cd);
+            border-radius: var(--border-radius);
+            color: var(--warning-color-dark, #856404);
+        }
+        
+        .screenshots-container {
+            margin-top: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            background-color: var(--background-light);
+        }
+        
+        .screenshot-navigation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 10px 0;
+        }
+        
+        .screenshot-display {
+            display: flex;
+            justify-content: center;
+            margin: 15px 0;
+            background-color: #1a1a1a;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+        
+        .screenshot-display img {
+            max-width: 100%;
+            max-height: 500px;
+            object-fit: contain;
+        }
+        
+        .screenshot-info {
+            text-align: center;
+            margin: 10px 0;
+        }
+        
+        #refresh-screenshots-btn {
+            display: block;
+            margin: 15px auto;
+        }
+    `;
+    document.head.appendChild(style);
     
     // Start the connection checker
     startConnectionChecker();
