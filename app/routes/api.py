@@ -61,8 +61,14 @@ def generate_accounts():
     # Initialize proxy manager
     proxy_list = proxy_settings.get('list', [])
     if isinstance(proxy_list, str):
-        # Convert string to list (one proxy per line)
+        # Convert string to list (one proxy per line) and clean each entry
         proxy_list = [p.strip() for p in proxy_list.split('\n') if p.strip()]
+    
+    # Add the single proxy to the list if specified
+    single_proxy = proxy_settings.get('address')
+    if single_proxy and single_proxy.strip():
+        if single_proxy.strip() not in proxy_list:
+            proxy_list.append(single_proxy.strip())
     
     proxy_manager = ProxyManager(
         proxy_type=proxy_settings.get('type', 'http'),
