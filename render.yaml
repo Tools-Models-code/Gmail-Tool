@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: backdoor-gmail-tool
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT "app:create_app()" --workers 2 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PROXY_LIST
+        sync: false
+      - key: DEFAULT_PROXY_TYPE
+        value: http
+    plan: free
+    autoDeploy: false
+    healthCheckPath: /
+    domains:
+      - backdoor-gmail-tool

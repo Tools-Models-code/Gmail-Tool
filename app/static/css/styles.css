@@ -390,12 +390,73 @@ main {
     color: var(--danger-color);
 }
 
+.result-item.preview {
+    border-left: 4px solid var(--primary-color);
+}
+
 .result-checkbox {
     margin-right: 0.75rem;
 }
 
+.checkbox {
+    margin-right: 0.75rem;
+}
+
+.checkbox input[type="checkbox"] {
+    display: none;
+}
+
+.checkbox label {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-color: var(--background-darker);
+    border: 2px solid var(--text-muted);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+}
+
+.checkbox input[type="checkbox"]:checked + label::after {
+    content: '\f00c';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--primary-color);
+}
+
 .result-details {
     flex: 1;
+}
+
+.status-pending {
+    color: var(--primary-color);
+}
+
+.status-success {
+    color: var(--success-color);
+}
+
+.status-failed {
+    color: var(--danger-color);
+}
+
+#generate-selected {
+    background-color: var(--success-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: background-color var(--transition-speed);
+    font-weight: bold;
+}
+
+#generate-selected:hover {
+    background-color: #36a66e;
 }
 
 .result-email {
