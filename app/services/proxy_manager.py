@@ -34,9 +34,16 @@ class ProxyManager:
         """Get a proxy from the list based on rotation settings"""
         if not self.proxy_list:
             return None
+            
+        # Filter out any empty strings in the proxy list
+        self.proxy_list = [p for p in self.proxy_list if p and p.strip()]
+        
+        if not self.proxy_list:
+            return None
         
         if self.use_rotation:
             # Get next proxy in rotation
+            self.current_proxy_index = self.current_proxy_index % len(self.proxy_list)
             proxy = self.proxy_list[self.current_proxy_index]
             self.current_proxy_index = (self.current_proxy_index + 1) % len(self.proxy_list)
         else:
@@ -97,18 +104,48 @@ class ProxyManager:
         if not proxy:
             return False, "No proxy provided"
             
-        formatted_proxy = self._format_proxy(proxy)
-        proxies = self.get_proxies_dict(formatted_proxy)
-        
         try:
+            # Clean the proxy string
+            proxy = proxy.strip()
+            
+            # Format proxy correctly
+            formatted_proxy = self._format_proxy(proxy)
+            proxies = self.get_proxies_dict(formatted_proxy)
+            
+            # Add a timeout to avoid hanging
+            timeout = 15
+            
+            # Use a test URL that returns HTTP status (faster than Google)
+            test_url = 'https://httpbin.org/status/200'
+            
             headers = {'User-Agent': self.get_user_agent()}
-            response = requests.get('https://www.google.com', 
-                                   proxies=proxies, 
-                                   headers=headers, 
-                                   timeout=10)
+            
+            # First, perform a basic connectivity test
+            response = requests.get(
+                test_url,
+                proxies=proxies,
+                headers=headers,
+                timeout=timeout,
+                allow_redirects=True
+            )
             
             if response.status_code == 200:
-                return True, "Proxy is working"
+                # If basic test passes, also try requesting Google to check for blocks
+                try:
+                    google_response = requests.get(
+                        'https://www.google.com/generate_204', 
+                        proxies=proxies,
+                        headers=headers,
+                        timeout=timeout
+                    )
+                    
+                    if google_response.status_code < 400:
+                        return True, "Proxy is working and can access Google"
+                    else:
+                        return False, f"Proxy may be blocked by Google. Status code: {google_response.status_code}"
+                except Exception:
+                    # If Google test fails, the proxy still works for basic connectivity
+                    return True, "Proxy is working but may have limited access"
             else:
                 return False, f"Proxy returned status code: {response.status_code}"
                 
@@ -118,6 +155,8 @@ class ProxyManager:
             return False, "Proxy connection timed out"
         except requests.exceptions.ReadTimeout:
             return False, "Proxy read timed out"
+        except requests.exceptions.SSLError:
+            return False, "SSL error with proxy (certificate verification failed)"
         except Exception as e:
             return False, f"Proxy test failed: {str(e)}"
 

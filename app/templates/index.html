@@ -115,11 +115,37 @@
                                     <label for="use-proxy-rotation">Use Proxy Rotation</label>
                                     <small class="form-text">Automatically rotate through proxies for each account creation</small>
                                 </div>
-                                <div class="form-group">
+                                <div class="form-group proxy-action-buttons">
                                     <button type="button" id="import-proxies" class="btn btn-secondary">
                                         <i class="fas fa-file-import"></i> Import Proxy List
                                     </button>
+                                    <button type="button" id="test-all-proxies" class="btn btn-primary">
+                                        <i class="fas fa-vials"></i> Test All Proxies
+                                    </button>
                                     <input type="file" id="proxy-file" accept=".txt" style="display: none;">
+                                </div>
+                                <div class="proxy-test-results" id="proxy-test-results" style="display: none;">
+                                    <h4><i class="fas fa-chart-bar"></i> Proxy Test Results</h4>
+                                    <div class="proxy-test-progress" id="proxy-test-progress">
+                                        <div class="progress-container">
+                                            <div class="progress-bar" id="proxy-test-progress-bar"></div>
+                                        </div>
+                                        <div class="progress-text" id="proxy-test-progress-text">0/0 proxies tested</div>
+                                    </div>
+                                    <div class="proxy-test-summary" id="proxy-test-summary">
+                                        <div class="summary-item">
+                                            <span class="label">Total:</span>
+                                            <span class="value" id="proxy-total-count">0</span>
+                                        </div>
+                                        <div class="summary-item">
+                                            <span class="label">Working:</span>
+                                            <span class="value success-count" id="proxy-working-count">0</span>
+                                        </div>
+                                        <div class="summary-item">
+                                            <span class="label">Failed:</span>
+                                            <span class="value failed-count" id="proxy-failed-count">0</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </form>

@@ -100,6 +100,106 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Test all proxies button
+    const testAllProxiesButton = document.getElementById('test-all-proxies');
+    const proxyTestResults = document.getElementById('proxy-test-results');
+    const proxyTestProgressBar = document.getElementById('proxy-test-progress-bar');
+    const proxyTestProgressText = document.getElementById('proxy-test-progress-text');
+    const proxyTotalCount = document.getElementById('proxy-total-count');
+    const proxyWorkingCount = document.getElementById('proxy-working-count');
+    const proxyFailedCount = document.getElementById('proxy-failed-count');
+    
+    testAllProxiesButton.addEventListener('click', async () => {
+        // Check if we have proxies to test
+        const proxyList = proxyListTextarea.value.trim();
+        const singleProxy = proxyAddressInput.value.trim();
+        
+        let proxiesToTest = [];
+        
+        if (proxyList) {
+            proxiesToTest = proxyList.split('\n').filter(line => line.trim());
+        }
+        
+        if (singleProxy && !proxiesToTest.includes(singleProxy)) {
+            proxiesToTest.unshift(singleProxy);
+        }
+        
+        if (proxiesToTest.length === 0) {
+            showNotification('Please enter at least one proxy to test', 'warning');
+            return;
+        }
+        
+        // Confirm with user if there are many proxies
+        if (proxiesToTest.length > 10) {
+            if (!confirm(`You are about to test ${proxiesToTest.length} proxies. This may take some time. Continue?`)) {
+                return;
+            }
+        }
+        
+        // Set up the UI
+        proxyTestResults.style.display = 'block';
+        proxyTestProgressBar.style.width = '0%';
+        proxyTestProgressText.textContent = `0/${proxiesToTest.length} proxies tested`;
+        proxyTotalCount.textContent = proxiesToTest.length;
+        proxyWorkingCount.textContent = '0';
+        proxyFailedCount.textContent = '0';
+        
+        // Disable button during test
+        testAllProxiesButton.disabled = true;
+        testAllProxiesButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+        
+        // Scroll to results
+        proxyTestResults.scrollIntoView({ behavior: 'smooth' });
+        
+        try {
+            const response = await fetch('/api/proxy/test_all', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    type: proxyTypeSelect.value,
+                    list: proxiesToTest
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Update counts
+                proxyTotalCount.textContent = data.total;
+                proxyWorkingCount.textContent = data.successful;
+                proxyFailedCount.textContent = data.failed;
+                
+                // Set progress to 100%
+                proxyTestProgressBar.style.width = '100%';
+                proxyTestProgressText.textContent = `${data.total}/${data.total} proxies tested`;
+                
+                // Update proxy list with only working proxies
+                if (data.working_proxies.length > 0) {
+                    if (data.failed > 0) {
+                        if (confirm(`${data.failed} proxies failed the test. Would you like to remove them from the list?`)) {
+                            proxyListTextarea.value = data.working_proxies.join('\n');
+                            showNotification(`Proxy list updated with ${data.successful} working proxies`, 'success');
+                        }
+                    } else {
+                        showNotification('All proxies are working correctly!', 'success');
+                    }
+                } else {
+                    showNotification('No working proxies found!', 'error');
+                }
+            } else {
+                showNotification(`Error: ${data.error || 'Failed to test proxies'}`, 'error');
+            }
+        } catch (error) {
+            showNotification('Error testing proxies: ' + error.message, 'error');
+        } finally {
+            // Re-enable button
+            testAllProxiesButton.disabled = false;
+            testAllProxiesButton.innerHTML = '<i class="fas fa-vials"></i> Test All Proxies';
+        }
+    });
+    
     // Generator form submission - Step 1: Generate email previews
     generatorForm.addEventListener('submit', async (e) => {
         e.preventDefault();
