@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
             resultItem.className = 'result-item preview';
             resultItem.innerHTML = `
                 <div class="checkbox">
-                    <input type="checkbox" id="email-${i}" class="email-checkbox" checked>
+                    <input type="checkbox" id="email-${i}" class="email-checkbox">
                     <label for="email-${i}"></label>
                 </div>
                 <div class="result-details">
@@ -186,14 +186,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const generateBtn = document.createElement('button');
             generateBtn.id = 'generate-selected';
             generateBtn.className = 'btn btn-primary';
-            generateBtn.innerHTML = '<i class="fas fa-cog"></i> Generate Selected';
+            generateBtn.innerHTML = '<i class="fas fa-cog"></i> Create Selected Accounts';
             actionsDiv.appendChild(generateBtn);
             
             // Add event listener to the new button
             generateBtn.addEventListener('click', generateSelectedAccounts);
         } else {
             // Show the button if it exists
-            document.getElementById('generate-selected').style.display = 'inline-block';
+            const generateBtn = document.getElementById('generate-selected');
+            generateBtn.style.display = 'inline-block';
+            generateBtn.innerHTML = '<i class="fas fa-cog"></i> Create Selected Accounts';
         }
         
         // Remove empty state if present
@@ -205,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Switch to results tab
         resultsTab.click();
         
-        showNotification(`Generated ${count} email previews. Select which ones to create.`, 'success');
+        showNotification(`Generated ${count} email previews. Please select which ones to create and click the "Create Selected Accounts" button.`, 'success');
     });
     
     // Step 2: Generate selected accounts
@@ -214,6 +216,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const checkboxes = document.querySelectorAll('.email-checkbox:checked');
         if (checkboxes.length === 0) {
             showNotification('Please select at least one email to generate', 'warning');
+            return;
+        }
+        
+        // Confirm with user
+        if (!confirm(`You are about to create ${checkboxes.length} Gmail accounts. Continue?`)) {
             return;
         }
         
