@@ -81,6 +81,10 @@ services:
         sync: false
       - key: DEFAULT_PROXY_TYPE
         value: http
+      - key: RENDER
+        value: "true"
+      - key: WEBSOCKIFY_PORT
+        value: "6080"
     plan: free
     autoDeploy: false
     healthCheckPath: /

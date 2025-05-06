@@ -51,10 +51,10 @@
                         <p>Connecting to browser display...</p>
                     </div>
                     
-                    <!-- noVNC iframe -->
+                    <!-- noVNC iframe - dynamic src set by JavaScript -->
                     <iframe 
                         id="vnc-iframe" 
-                        src="/vnc-viewer" 
+                        src="about:blank"
                         frameborder="0"
                         allowfullscreen="true"
                         webkitallowfullscreen="true"
@@ -183,11 +183,55 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Check connection status periodically
     let connectionChecker;
+    let lastConnectionStatus = null;
+    let connectionAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
     
     // Start connection status checker
     function startConnectionChecker() {
         connectionChecker = setInterval(checkConnectionStatus, 5000);
         checkConnectionStatus(); // Check immediately
+    }
+    
+    // Set up iframe with the appropriate VNC URL
+    function setupVncIframe(streamInfo) {
+        const iframe = document.getElementById('vnc-iframe');
+        
+        // Only update the iframe if it's not already loaded or if the status has changed
+        if (iframe.src === 'about:blank' || lastConnectionStatus !== streamInfo.status) {
+            loadingDisplay.style.display = 'flex';
+            
+            // If we have a valid URL and the connection is running
+            if (streamInfo.url && streamInfo.status === 'running') {
+                // Display loading message until iframe loads
+                loadingDisplay.querySelector('p').textContent = 'Connecting to VNC stream...';
+                
+                // Set the iframe source
+                if (streamInfo.is_cloud) {
+                    // For cloud environments (render.com), use the VNC viewer route
+                    iframe.src = streamInfo.url;
+                } else {
+                    // For local environments, use direct URL
+                    iframe.src = streamInfo.url;
+                }
+                
+                console.log(`Loading VNC iframe with URL: ${iframe.src}`);
+                
+                // Reset connection attempts on successful connection
+                connectionAttempts = 0;
+            } else {
+                // If no valid URL, show appropriate message
+                loadingDisplay.querySelector('p').textContent = 
+                    streamInfo.status === 'partial' ? 'WebSocket proxy not available' : 
+                    'VNC connection not available';
+                
+                // Keep iframe blank
+                iframe.src = 'about:blank';
+            }
+        }
+        
+        // Save current status
+        lastConnectionStatus = streamInfo.status;
     }
     
     // Check VNC connection status
@@ -200,6 +244,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const fullscreenBtn = document.getElementById('fullscreen-btn');
                 
                 if (data.success) {
+                    // Track info about whether we're in a cloud environment
+                    const isCloudEnv = data.stream.is_cloud;
+                    
                     // Handle different status cases
                     switch(data.stream.status) {
                         case 'running':
@@ -207,9 +254,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             connectionStatus.textContent = 'Connected';
                             connectionStatus.classList.remove('status-disconnected');
                             connectionStatus.classList.add('status-connected');
-                            loadingDisplay.style.display = 'none';
                             fallbackMessage.style.display = 'none';
                             connectionMessage.textContent = data.stream.message || '';
+                            
+                            // Set up the VNC iframe
+                            setupVncIframe(data.stream);
                             break;
                             
                         case 'partial':
@@ -221,6 +270,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             loadingDisplay.querySelector('p').textContent = 'WebSocket proxy not available';
                             fallbackMessage.style.display = 'block';
                             connectionMessage.textContent = data.stream.message || '';
+                            
+                            // If we've been trying to connect too many times, fall back to screenshots
+                            if (connectionAttempts > MAX_RECONNECT_ATTEMPTS) {
+                                loadScreenshots();
+                            } else {
+                                connectionAttempts++;
+                            }
                             break;
                             
                         case 'screenshot_only':
@@ -246,6 +302,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             loadingDisplay.style.display = 'flex';
                             fallbackMessage.style.display = 'block';
                             connectionMessage.textContent = data.stream.message || 'VNC service unavailable';
+                            
+                            // If we're on render.com, provide more specific information
+                            if (isCloudEnv) {
+                                connectionMessage.textContent += ' This is expected in cloud environments. The VNC service will start when needed.';
+                            }
                     }
                 } else {
                     // API call was successful but returned error
@@ -269,14 +330,22 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Handle iframe loaded
     iframe.addEventListener('load', function() {
-        // Hide loading display after iframe is loaded
-        loadingDisplay.style.display = 'none';
+        // Only hide loading display if the iframe has a real URL
+        if (iframe.src !== 'about:blank') {
+            loadingDisplay.style.display = 'none';
+        }
     });
     
     // Handle reconnect button
     reconnectBtn.addEventListener('click', function() {
         loadingDisplay.style.display = 'flex';
-        iframe.src = iframe.src; // Reload iframe
+        loadingDisplay.querySelector('p').textContent = 'Reconnecting...';
+        
+        // Reset connection attempts
+        connectionAttempts = 0;
+        
+        // Force reload the status
+        checkConnectionStatus();
     });
     
     // Handle reload viewer button

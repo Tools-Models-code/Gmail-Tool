@@ -28,8 +28,8 @@ class DisplayStreamer:
         self.status_thread = None
         self.running = False
         
-        # noVNC directory for web client
-        self.novnc_dir = '/tmp/novnc'
+        # noVNC directory for web client - use the local project directory for reliability
+        self.novnc_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'novnc')
         
         # Register cleanup on exit
         atexit.register(self.stop)
@@ -168,17 +168,18 @@ class DisplayStreamer:
     def _setup_novnc(self):
         """Set up noVNC for browser-based VNC viewing"""
         try:
+            # Ensure noVNC directory exists (should already be in the project)
             if not os.path.exists(self.novnc_dir):
-                logger.info("Setting up noVNC...")
-                os.makedirs(self.novnc_dir, exist_ok=True)
-                
-                # Clone noVNC repository
-                subprocess.run(
-                    ['git', 'clone', 'https://github.com/novnc/noVNC.git', self.novnc_dir],
-                    check=True
-                )
-                
-                # Install websockify
+                logger.warning(f"noVNC directory {self.novnc_dir} not found. Web viewing may not work properly.")
+            else:
+                logger.info(f"Using noVNC from {self.novnc_dir}")
+            
+            # Ensure websockify is installed
+            try:
+                import websockify
+                logger.info("Websockify is already installed")
+            except ImportError:
+                logger.info("Installing websockify...")
                 subprocess.run(['pip', 'install', 'websockify'], check=True)
             
             # Start websockify
@@ -187,6 +188,16 @@ class DisplayStreamer:
                 str(self.websockify_port),
                 f'localhost:{self.vnc_port}'
             ]
+            
+            # Add specific options for render.com and other cloud environments
+            if os.environ.get('RENDER') or os.environ.get('PRODUCTION'):
+                logger.info("Detected cloud environment, adding appropriate websockify options")
+                # Use HTTP protocol for better compatibility with proxies
+                websockify_cmd.extend(['--web', self.novnc_dir])
+                # Disable SSL for internal connections
+                websockify_cmd.append('--ssl-only=0')
+                # Allow connections from the proxied domain
+                websockify_cmd.append('--auth-plugin=None')
             
             self.websockify_process = subprocess.Popen(
                 websockify_cmd,
@@ -240,7 +251,13 @@ class DisplayStreamer:
         # Check if websockify process is actually running
         websockify_running = self.websockify_process is not None and self.websockify_process.poll() is None
         
-        base_url = f"/vnc/?host=localhost&port={self.websockify_port}"
+        # Determine the correct URL for the environment
+        if os.environ.get('RENDER') or os.environ.get('PRODUCTION'):
+            # In cloud environments, we use a different URL format
+            base_url = "/vnc-viewer"
+        else:
+            # For local development
+            base_url = f"/vnc/?host=localhost&port={self.websockify_port}"
         
         status = "unavailable"
         message = ""
@@ -260,5 +277,6 @@ class DisplayStreamer:
             'websocket_port': self.websockify_port,
             'url': base_url if status == "running" else None,
             'status': status,
-            'message': message
+            'message': message,
+            'is_cloud': bool(os.environ.get('RENDER') or os.environ.get('PRODUCTION'))
         }
