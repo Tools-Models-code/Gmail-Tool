@@ -62,13 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize parent email visibility
         document.getElementById('parent-email-group').style.display = createChildAccountCheckbox.checked ? 'block' : 'none';
     
-        // Handle browser view button
-        const openBrowserWindowButton = document.getElementById('open-browser-window');
-        if (openBrowserWindowButton) {
-            openBrowserWindowButton.addEventListener('click', function() {
-                window.open('/browser-view', 'browserView', 'width=1200,height=800,resizable=yes');
-            });
-        }
+        // Remove browser view button functionality as it's now integrated into the main page
     
         // Handle show browser screenshots button
         const showBrowserScreenshotButton = document.getElementById('show-browser-screenshot');
@@ -947,11 +941,7 @@ document.addEventListener('DOMContentLoaded', function() {
             captureAndShowBrowserScreenshot();
         });
         
-        // Setup open browser window button
-        const openWindowBtn = document.getElementById('open-browser-window');
-        openWindowBtn.addEventListener('click', () => {
-            openBrowserStatusWindow();
-        });
+        // Browser window functionality is now integrated into the main page
         
         // Set up manual continue button
         const manualContinueBtn = document.getElementById('manual-continue');
@@ -1002,90 +992,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Open a new window with browser status information
-    function openBrowserStatusWindow() {
-        const statusWindow = window.open('', 'BrowserStatus', 'width=600,height=400');
-        if (statusWindow) {
-            statusWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Browser Automation Status</title>
-                    <style>
-                        body {
-                            font-family: Arial, sans-serif;
-                            margin: 0;
-                            padding: 20px;
-                            background: #2f3136;
-                            color: #dcddde;
-                        }
-                        .status-header {
-                            margin-bottom: 20px;
-                            border-bottom: 1px solid #40444b;
-                            padding-bottom: 10px;
-                        }
-                        .status-item {
-                            margin-bottom: 15px;
-                            padding: 10px;
-                            background: #36393f;
-                            border-radius: 5px;
-                        }
-                        .status-title {
-                            font-weight: bold;
-                            margin-bottom: 5px;
-                        }
-                        .log-container {
-                            height: 200px;
-                            overflow-y: auto;
-                            background: #40444b;
-                            padding: 10px;
-                            border-radius: 5px;
-                            margin-top: 10px;
-                        }
-                        .log-entry {
-                            margin-bottom: 5px;
-                            font-family: monospace;
-                            font-size: 12px;
-                        }
-                        .success { color: #43b581; }
-                        .info { color: #7289da; }
-                        .warning { color: #faa61a; }
-                        .error { color: #f04747; }
-                    </style>
-                </head>
-                <body>
-                    <div class="status-header">
-                        <h2>Browser Automation Status</h2>
-                        <p>This window shows the current status of the browser automation process</p>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-title">Browser Status:</div>
-                        <div>Running automation tasks</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-title">Current Action:</div>
-                        <div>Creating Gmail account</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-title">Activity Log:</div>
-                        <div class="log-container" id="log-container">
-                            <div class="log-entry info">Browser launched successfully</div>
-                            <div class="log-entry info">Navigated to account creation page</div>
-                            <div class="log-entry info">Filling out account details...</div>
-                        </div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-title">Note:</div>
-                        <div>The actual browser window is running on your desktop. This is just a status window.</div>
-                    </div>
-                </body>
-                </html>
-            `);
-            statusWindow.document.close();
-            
-            addLogEntry('Opened browser status window', 'info');
-        } else {
-            showNotification('Unable to open browser status window. Please check your popup blocker settings.', 'warning');
+    // Browser display functionality is now integrated into the main page
+    function showBrowserStatus() {
+        // Display browser status in the main UI
+        addLogEntry('Browser display now shown in the main interface', 'info');
+        
+        // Show the browser frame if not already visible
+        document.getElementById('browser-frame').style.display = 'block';
+        
+        // Update the browser placeholder to show it's active
+        const placeholder = document.getElementById('browser-placeholder');
+        if (placeholder) {
+            placeholder.style.display = 'none';
         }
+        
+        // Refresh connection status
+        const statusCheckEvent = new Event('checkStatus');
+        document.dispatchEvent(statusCheckEvent);
     }
     
     // Add log entry

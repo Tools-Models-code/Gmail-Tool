@@ -733,76 +733,69 @@ class PlaywrightGmailGenerator:
         import subprocess
         import platform
         
-        # Try to install Chrome directly if it's not found
-        def install_chrome_if_needed():
-            try:
-                self.logger.info("Attempting to install Chrome...")
-                
-                # Check if we're on render.com or similar environment
-                if os.environ.get('RENDER') or os.environ.get('PRODUCTION'):
-                    # Create directory for Chrome
-                    chrome_dir = os.path.expanduser("~/chrome-linux")
-                    os.makedirs(chrome_dir, exist_ok=True)
-                    
-                    # Check if we already have Chrome downloaded
-                    chrome_path = os.path.join(chrome_dir, "chrome")
-                    if os.path.exists(chrome_path) and os.access(chrome_path, os.X_OK):
-                        self.logger.info(f"Chrome already installed at {chrome_path}")
-                        return chrome_path
-                    
-                    # Download and extract Chrome
-                    self.logger.info("Downloading Chrome...")
-                    
-                    # Use a more direct method to download and extract
-                    download_cmd = [
-                        "cd ~",
-                        "curl -L https://playwright.azureedge.net/builds/chromium/1108/chromium-linux.zip -o chromium.zip",
-                        "unzip -o chromium.zip",
-                        "mv chrome-linux/* ~/chrome-linux/ || true",
-                        "chmod +x ~/chrome-linux/chrome"
-                    ]
-                    
-                    for cmd in download_cmd:
-                        subprocess.run(cmd, shell=True, check=True)
-                    
-                    if os.path.exists(chrome_path):
-                        self.logger.info(f"Successfully installed Chrome to {chrome_path}")
-                        return chrome_path
-                
-                # Try to install Playwright browsers
-                self.logger.info("Installing Playwright browsers...")
-                try:
-                    # Try to install playwright browsers using Python
-                    install_cmd = "python -m playwright install chromium"
-                    subprocess.run(install_cmd, shell=True, check=True)
-                    
-                    # Also try installing with --with-deps
-                    install_cmd = "python -m playwright install-deps chromium"
-                    subprocess.run(install_cmd, shell=True, check=False)  # Don't fail if this fails
-                    
-                    self.logger.info("Playwright browsers installed successfully")
-                except Exception as e:
-                    self.logger.error(f"Failed to install Playwright browsers: {str(e)}")
-            except Exception as e:
-                self.logger.error(f"Failed to install Chrome: {str(e)}")
+        # Priority location for Chrome in render.com and container environments
+        # Using /tmp which is always writable in most environments
+        tmp_chrome_dir = "/tmp/chrome-linux"
+        tmp_chrome_path = os.path.join(tmp_chrome_dir, "chrome")
+        
+        # First check if CHROME_PATH environment variable is set
+        if 'CHROME_PATH' in os.environ:
+            custom_path = os.environ['CHROME_PATH']
+            if custom_path and os.path.exists(custom_path) and os.access(custom_path, os.X_OK):
+                self.logger.info(f"Using Chrome from environment variable: {custom_path}")
+                return custom_path
+        
+        # Check if we're in render.com or cloud environment
+        is_cloud_env = bool(os.environ.get('RENDER') or os.environ.get('PRODUCTION'))
+        
+        # For cloud environments, prioritize installing Chrome in /tmp 
+        if is_cloud_env:
+            self.logger.info("Detected cloud environment, checking for Chrome in /tmp...")
             
-            return None
+            # Check if Chrome is already installed in /tmp
+            if os.path.exists(tmp_chrome_path) and os.access(tmp_chrome_path, os.X_OK):
+                self.logger.info(f"Found Chrome in /tmp: {tmp_chrome_path}")
+                return tmp_chrome_path
+            
+            # Install Chrome in /tmp directory which is always writable
+            self.logger.info("Installing Chrome in /tmp directory...")
+            try:
+                os.makedirs(tmp_chrome_dir, exist_ok=True)
+                
+                # Download compact chromium directly to /tmp
+                download_cmds = [
+                    f"cd {tmp_chrome_dir} && curl -L https://playwright.azureedge.net/builds/chromium/1108/chromium-linux.zip -o chromium.zip",
+                    f"cd {tmp_chrome_dir} && unzip -o chromium.zip -d . && rm chromium.zip",
+                    f"cd {tmp_chrome_dir} && chmod +x chrome"
+                ]
+                
+                for cmd in download_cmds:
+                    subprocess.run(cmd, shell=True, check=True)
+                
+                if os.path.exists(tmp_chrome_path) and os.access(tmp_chrome_path, os.X_OK):
+                    self.logger.info(f"Successfully installed Chrome to {tmp_chrome_path}")
+                    # Set appropriate environment variables to ensure Playwright uses this Chrome
+                    os.environ['CHROME_PATH'] = tmp_chrome_path
+                    os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] = tmp_chrome_path
+                    return tmp_chrome_path
+                else:
+                    self.logger.warning(f"Chrome installation failed, file not found at {tmp_chrome_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to install Chrome in /tmp: {str(e)}")
         
         # Possible locations for Chrome/Chromium on different platforms
         linux_paths = [
-            # User-installed Playwright browsers (most common locations)
+            # Directly check /tmp first (our preferred installation location)
+            "/tmp/chrome-linux/chrome",
+            # User-installed Playwright browsers (common locations)
             os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux/chrome"),
-            os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux/chrome-linux/chrome"),
             os.path.expanduser("~/.cache/playwright/chromium-*/chrome-linux/chrome"),
             # Render.com specific paths
             os.path.expanduser("~/chrome-linux/chrome"),
-            os.path.expanduser("~/chromium/chrome-linux/chrome"),
-            # Direct download location
-            "/tmp/chrome-linux/chrome",
-            # System Chrome/Chromium on Linux
+            # Common system paths
             "/usr/bin/google-chrome",
             "/usr/bin/google-chrome-stable",
-            "/opt/google/chrome/chrome",
+            "/opt/google/chrome/chrome",  # Path mentioned in the error
             "/opt/google/chrome/google-chrome",
             "/usr/bin/chromium",
             "/usr/bin/chromium-browser",
@@ -840,6 +833,8 @@ class PlaywrightGmailGenerator:
                 for path in matching_paths:
                     if os.path.exists(path) and os.access(path, os.X_OK):
                         self.logger.info(f"Found Chrome executable at: {path}")
+                        # Set environment variable to ensure Playwright uses this Chrome
+                        os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] = path
                         return path
         
         # If no executable found using patterns, try using 'which' command on Linux/Mac
@@ -851,15 +846,51 @@ class PlaywrightGmailGenerator:
                         path = which_cmd.stdout.strip()
                         if os.path.exists(path) and os.access(path, os.X_OK):
                             self.logger.info(f"Found Chrome using 'which' at: {path}")
+                            # Set environment variable to ensure Playwright uses this Chrome
+                            os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] = path
                             return path
             except Exception:
                 pass  # Ignore errors from which command
         
-        # Try to install Chrome if we couldn't find it
-        chrome_path = install_chrome_if_needed()
-        if chrome_path:
-            return chrome_path
+        # If not found yet, try to install in /tmp regardless of environment
+        if not os.path.exists(tmp_chrome_path):
+            self.logger.info("Attempting to install Chrome in /tmp as last resort...")
+            try:
+                os.makedirs(tmp_chrome_dir, exist_ok=True)
+                download_cmds = [
+                    f"cd {tmp_chrome_dir} && curl -L https://playwright.azureedge.net/builds/chromium/1108/chromium-linux.zip -o chromium.zip",
+                    f"cd {tmp_chrome_dir} && unzip -o chromium.zip -d . && rm chromium.zip",
+                    f"cd {tmp_chrome_dir} && chmod +x chrome"
+                ]
+                
+                for cmd in download_cmds:
+                    subprocess.run(cmd, shell=True, check=True)
+                
+                if os.path.exists(tmp_chrome_path) and os.access(tmp_chrome_path, os.X_OK):
+                    self.logger.info(f"Successfully installed Chrome to {tmp_chrome_path}")
+                    # Set environment variable to ensure Playwright uses this Chrome
+                    os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] = tmp_chrome_path
+                    return tmp_chrome_path
+            except Exception as e:
+                self.logger.error(f"Failed to install Chrome in /tmp: {str(e)}")
         
-        # If no executable found, return None to let Playwright use its default
+        # As a last resort, try installing via Playwright
+        try:
+            self.logger.info("Trying to install Chrome via Playwright...")
+            # Set env var to ensure playwright installs browsers in user space
+            os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.path.expanduser("~/.cache/playwright")
+            subprocess.run("python -m playwright install chromium", shell=True, check=False)
+            
+            # Look for the installed browser
+            playwright_paths = glob.glob(os.path.expanduser("~/.cache/playwright/chromium-*/chrome-linux/chrome"))
+            if playwright_paths:
+                for path in playwright_paths:
+                    if os.path.exists(path) and os.access(path, os.X_OK):
+                        self.logger.info(f"Found Playwright-installed Chrome at: {path}")
+                        os.environ['PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'] = path
+                        return path
+        except Exception as e:
+            self.logger.error(f"Failed to install Chrome via Playwright: {str(e)}")
+        
         self.logger.warning("No Chrome executable found, using Playwright default")
         return None

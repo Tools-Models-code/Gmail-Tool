@@ -15,18 +15,7 @@ def about():
     """Render the about page"""
     return render_template('about.html')
 
-@bp.route('/browser-view')
-def browser_view():
-    """Render the browser view page with noVNC client"""
-    # Get the host and port for WebSockets
-    ws_host = request.host.split(':')[0]  # Extract host without port
-    ws_port = 6080  # Default websockify port
-    
-    return render_template(
-        'browser_view.html',
-        ws_host=ws_host,
-        ws_port=ws_port
-    )
+# Remove browser view route as we're integrating noVNC directly into the main page
 
 @bp.route('/vnc-viewer')
 def vnc_viewer():
