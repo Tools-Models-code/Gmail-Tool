@@ -21,6 +21,14 @@ class ProxyManager:
             if os.path.exists(proxy_file):
                 with open(proxy_file, 'r') as f:
                     self.proxy_list = [line.strip() for line in f if line.strip()]
+                    
+        # Clean and normalize the proxy list
+        if self.proxy_list:
+            cleaned_list = []
+            for proxy in self.proxy_list:
+                if proxy and proxy.strip():
+                    cleaned_list.append(proxy.strip())
+            self.proxy_list = cleaned_list
     
     def get_proxy(self):
         """Get a proxy from the list based on rotation settings"""
@@ -41,12 +49,27 @@ class ProxyManager:
         """Format the proxy string based on the proxy type"""
         if not proxy:
             return None
+        
+        # Clean the proxy string (remove any whitespace)
+        proxy = proxy.strip()
             
         # If proxy already has the type prefix, return as is
         if proxy.startswith(('http://', 'https://', 'socks4://', 'socks5://')):
             return proxy
-            
-        # Add the appropriate prefix based on proxy type
+        
+        # Handle proxy strings with protocol names without "://"
+        if proxy.startswith(('http', 'https', 'socks4', 'socks5')):
+            # Extract the protocol and address
+            parts = proxy.split(' ', 1)
+            if len(parts) == 2:
+                protocol = parts[0].lower()
+                address = parts[1].strip()
+                
+                # Add "://" between protocol and address
+                if protocol in ['http', 'https', 'socks4', 'socks5']:
+                    return f"{protocol}://{address}"
+        
+        # Add the appropriate prefix based on the proxy type
         return f"{self.proxy_type}://{proxy}"
     
     def get_proxies_dict(self, proxy=None):

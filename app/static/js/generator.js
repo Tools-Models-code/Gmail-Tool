@@ -266,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Switch to proxy tab to ensure user configures proxies
-        document.querySelector('a[href="#proxy"]').click();
+        document.querySelector('.tab[data-tab="proxy"]').click();
         
         // Show proxy setup modal
         showProxySetupModal(checkboxes.length);
@@ -418,6 +418,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // Force show browser to be checked
         showBrowserCheckbox.checked = true;
         
+        // Switch to the Creation tab
+        document.querySelector('.tab[data-tab="creation"]').click();
+        
+        // Set up the creation log
+        initializeCreationLog();
+        
+        // Enable the manual continue button
+        document.getElementById('manual-continue').disabled = false;
+        
+        // Add log entry
+        addLogEntry('Starting account creation process...', 'info');
+        addLogEntry(`Creating ${selectedEmails.length} Gmail accounts`, 'info');
+        
         // Get proxy settings
         const useProxy = useProxyCheckbox.checked;
         let proxySettings = {};
@@ -433,6 +446,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 list: proxyList, // Send as string, server will parse
                 use_rotation: useProxyRotation
             };
+            
+            addLogEntry(`Proxy configuration: ${useProxy ? 'Enabled' : 'Disabled'}`, 'info');
+            if (useProxy) {
+                addLogEntry(`Proxy type: ${proxyType}`, 'info');
+                if (proxyAddress) {
+                    addLogEntry(`Using proxy: ${hideProxyAuth(proxyAddress)}`, 'info');
+                }
+                if (proxyList) {
+                    const proxyCount = proxyList.split('\n').filter(line => line.trim()).length;
+                    addLogEntry(`Using ${proxyCount} proxies with rotation: ${useProxyRotation ? 'enabled' : 'disabled'}`, 'info');
+                }
+            }
         }
         
         // Show loading modal
@@ -441,6 +466,8 @@ document.addEventListener('DOMContentLoaded', function() {
         progressText.textContent = `0/${selectedEmails.length} accounts`;
         
         try {
+            addLogEntry('Sending account creation request to server...', 'info');
+            
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: {
@@ -455,11 +482,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
             
+            addLogEntry('Received response from server', 'info');
+            
             const data = await response.json();
             
             if (response.ok) {
                 // Store generated accounts
                 generatedAccounts = data.results;
+                
+                // Update the creation log with results
+                const successful = data.summary.successful;
+                const total = data.summary.total;
+                
+                if (successful === total) {
+                    addLogEntry(`Successfully created all ${total} accounts!`, 'success');
+                } else {
+                    addLogEntry(`Created ${successful} out of ${total} accounts`, successful > 0 ? 'info' : 'warning');
+                    
+                    // Log failed accounts
+                    const failedAccounts = data.results.filter(r => !r.success);
+                    if (failedAccounts.length > 0) {
+                        addLogEntry(`Failed to create ${failedAccounts.length} accounts:`, 'error');
+                        failedAccounts.forEach(account => {
+                            addLogEntry(`- ${account.email}: ${account.message}`, 'error');
+                        });
+                    }
+                }
                 
                 // Update results tab
                 updateResultsTab(data.results, data.summary);
@@ -470,15 +518,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     generateBtn.style.display = 'none';
                 }
                 
+                addLogEntry('Process completed. You can view the results in the Results tab.', 'info');
                 showNotification(`Generated ${data.summary.successful} out of ${data.summary.total} accounts`, 'success');
             } else {
+                addLogEntry(`Error: ${data.error || 'Failed to generate accounts'}`, 'error');
                 showNotification(`Error: ${data.error || 'Failed to generate accounts'}`, 'error');
             }
         } catch (error) {
+            addLogEntry(`Error generating accounts: ${error.message}`, 'error');
             showNotification('Error generating accounts: ' + error.message, 'error');
         } finally {
             // Hide loading modal
             loadingModal.classList.remove('active');
+            
+            // Disable the manual continue button
+            document.getElementById('manual-continue').disabled = true;
         }
     }
     
@@ -487,6 +541,70 @@ document.addEventListener('DOMContentLoaded', function() {
         const percentage = (current / total) * 100;
         progressBar.style.width = `${percentage}%`;
         progressText.textContent = `${current}/${total} accounts`;
+        
+        // Also update the creation log
+        addLogEntry(`Progress: ${current}/${total} accounts (${percentage.toFixed(0)}%)`, 'info');
+    }
+    
+    // Initialize creation log
+    function initializeCreationLog() {
+        const creationLog = document.getElementById('creation-log');
+        creationLog.innerHTML = '';
+        
+        // Add initial message
+        addLogEntry('Initializing account creation process...', 'info');
+        
+        // Set up browser placeholder
+        const browserPlaceholder = document.getElementById('browser-placeholder');
+        browserPlaceholder.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-desktop"></i>
+                <p>The browser will open on your computer shortly</p>
+                <small style="margin-top: 10px; color: var(--text-muted);">You may need to bring the browser window to the front</small>
+            </div>
+        `;
+        
+        // Set up manual continue button
+        const manualContinueBtn = document.getElementById('manual-continue');
+        manualContinueBtn.addEventListener('click', () => {
+            addLogEntry('Manual continue requested by user', 'info');
+            showNotification('Continuing the account creation process...', 'info');
+            manualContinueBtn.disabled = true;
+        });
+    }
+    
+    // Add log entry
+    function addLogEntry(message, type = 'info') {
+        const creationLog = document.getElementById('creation-log');
+        const now = new Date();
+        const timeString = now.toLocaleTimeString();
+        
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry log-${type}`;
+        logEntry.innerHTML = `
+            <div class="log-time">[${timeString}]</div>
+            <div class="log-message">${message}</div>
+        `;
+        
+        creationLog.appendChild(logEntry);
+        
+        // Scroll to bottom
+        creationLog.scrollTop = creationLog.scrollHeight;
+    }
+    
+    // Hide authentication credentials in proxy addresses
+    function hideProxyAuth(proxyAddress) {
+        // If proxy has authentication (username:password@host:port), hide the password
+        if (proxyAddress.includes('@')) {
+            const parts = proxyAddress.split('@');
+            const authParts = parts[0].split(':');
+            
+            if (authParts.length >= 2) {
+                // Hide the password part
+                return `${authParts[0]}:****@${parts[1]}`;
+            }
+        }
+        return proxyAddress;
     }
     
     // Update results tab with generated accounts
@@ -600,6 +718,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Copy selected button
     copySelectedButton.addEventListener('click', () => {
+        // Check if we're in preview mode or results mode
+        const emailCheckboxes = document.querySelectorAll('.email-checkbox:checked');
+        if (emailCheckboxes.length > 0) {
+            // We're in preview mode
+            const selectedEmails = Array.from(emailCheckboxes).map(checkbox => {
+                const emailElement = checkbox.closest('.result-item').querySelector('.result-email');
+                const passwordElement = checkbox.closest('.result-item').querySelector('.result-password');
+                return {
+                    email: emailElement.textContent,
+                    password: passwordElement.textContent.replace('Password: ', '')
+                };
+            });
+            copyAccountsToClipboard(selectedEmails);
+            return;
+        }
+        
+        // We're in results mode
         const selectedIndices = getSelectedIndices();
         if (selectedIndices.length === 0) {
             showNotification('Please select at least one account', 'warning');
